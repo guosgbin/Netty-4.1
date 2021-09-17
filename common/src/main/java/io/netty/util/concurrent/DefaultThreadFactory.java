@@ -32,7 +32,7 @@ public class DefaultThreadFactory implements ThreadFactory {
 
     //
     private final AtomicInteger nextId = new AtomicInteger();
-    // 线程名的前缀
+    // 线程名的前缀  "类简单名称-poolId自增ID-"
     private final String prefix;
     // 是否是守护线程
     private final boolean daemon;
@@ -74,6 +74,8 @@ public class DefaultThreadFactory implements ThreadFactory {
     }
 
     /**
+     * 返回Class的简单名称，并且首字母变小写
+     * eg.  io.netty.channel.nio.NioEventLoop -> 是nioEventLoop
      *
      * @param poolType
      * @return
@@ -82,6 +84,7 @@ public class DefaultThreadFactory implements ThreadFactory {
         ObjectUtil.checkNotNull(poolType, "poolType");
 
         String poolName = StringUtil.simpleClassName(poolType);
+        // 变小写
         switch (poolName.length()) {
             case 0:
                 return "unknown";
@@ -99,11 +102,13 @@ public class DefaultThreadFactory implements ThreadFactory {
     public DefaultThreadFactory(String poolName, boolean daemon, int priority, ThreadGroup threadGroup) {
         ObjectUtil.checkNotNull(poolName, "poolName");
 
+        // 校验优先级
         if (priority < Thread.MIN_PRIORITY || priority > Thread.MAX_PRIORITY) {
             throw new IllegalArgumentException(
                     "priority: " + priority + " (expected: Thread.MIN_PRIORITY <= priority <= Thread.MAX_PRIORITY)");
         }
 
+        // 线程池前缀  "类简单名称-自增ID-"
         prefix = poolName + '-' + poolId.incrementAndGet() + '-';
         this.daemon = daemon;
         this.priority = priority;
@@ -114,6 +119,9 @@ public class DefaultThreadFactory implements ThreadFactory {
         this(poolName, daemon, priority, null);
     }
 
+    /**
+     * 创建一个线程 类型:FastThreadLocalThread
+     */
     @Override
     public Thread newThread(Runnable r) {
         Thread t = newThread(FastThreadLocalRunnable.wrap(r), prefix + nextId.incrementAndGet());

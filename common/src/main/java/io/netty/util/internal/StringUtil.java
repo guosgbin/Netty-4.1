@@ -300,7 +300,7 @@ public final class StringUtil {
 
     /**
      * 获取类名的简单方式
-     *
+     * 例如 io.netty.channel.nio.NioEventLoop, 调用此方法后就是NioEventLoop
      *
      * Generates a simplified name from a {@link Class}.  Similar to {@link Class#getSimpleName()}, but it works fine
      * with anonymous classes.
