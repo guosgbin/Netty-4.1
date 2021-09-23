@@ -54,6 +54,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
     private volatile SocketAddress localAddress;
     private volatile SocketAddress remoteAddress;
     private volatile EventLoop eventLoop;
+    // 是否已经注册过
     private volatile boolean registered;
     private boolean closeInitiated;
     private Throwable initialCloseCause;
@@ -70,12 +71,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected AbstractChannel(Channel parent) {
         this.parent = parent;
-        // 给Channel分配一个ID
+        // 给Channel实例分配一个ID对象
         id = newId();
         // 封装一个unsafe对象
+        // 当Channel是NioServerSocketChannel时，Unsafe实例是NioMessageUnSafe
         unsafe = newUnsafe();
         // 构建Channel消息处理管道Pipeline
-        // 设置好两个节点，一个头结点HeadContext，一个尾节点TailContext
+        // 设置好两个节点(默认的处理器)，一个头结点HeadContext，一个尾节点TailContext
         pipeline = newChannelPipeline();
     }
 
@@ -465,10 +467,18 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             return remoteAddress0();
         }
 
+        /**
+         * 注册方法
+         *
+         * @param eventLoop
+         * @param promise
+         */
         @Override
         public final void register(EventLoop eventLoop, final ChannelPromise promise) {
             ObjectUtil.checkNotNull(eventLoop, "eventLoop");
+            // 防止Channel重复注册
             if (isRegistered()) {
+                // 已经注册过 设置promise结果是失败，这样监听者会回调失败的逻辑
                 promise.setFailure(new IllegalStateException("registered to an event loop already"));
                 return;
             }
@@ -478,12 +488,17 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 绑定Channel和EventLoop的关系
+            // 后续Channel上的事件或者任务都会用这个EventLoop线程去处理
             AbstractChannel.this.eventLoop = eventLoop;
 
+            // 当前线程是否是当前EventLoop线程自己
+            // 目的是，为了线程安全，最终都是EventLoop这个线程去执行注册
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
                 try {
+                    // 将注册的任务提交到eventLoop的队列中
                     eventLoop.execute(new Runnable() {
                         @Override
                         public void run() {
@@ -501,26 +516,36 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
         }
 
+        /**
+         * 该方法是当前Channel关联的EventLoop线程执行的
+         * @param promise 表示注册结果，外部可以使用这个来完成注册成功或者失败对应的操作
+         */
         private void register0(ChannelPromise promise) {
             try {
                 // check if the channel is still open as it could be closed in the mean time when the register
                 // call was outside of the eventLoop
+                // 检查通道是否仍处于打开状态，因为在register方法调用位于eventLoop之外的同时，通道可能会关闭
                 if (!promise.setUncancellable() || !ensureOpen(promise)) {
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
                 doRegister();
                 neverRegistered = false;
+                // 表示当前Channel已经注册到Selector了
                 registered = true;
 
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
                 pipeline.invokeHandlerAddedIfNeeded();
 
+                // 设置promise结果为成功，notifyAll等待的线程，回调注册相关的promise的Listener
                 safeSetSuccess(promise);
+                // 向当前Channel的pipeline发起一个 注册完成时间， 关注的handlder可以做一些自己的事情
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
+                // NIoServerSocketChannel角度来说
+                // 这一步bind操作肯定没有完成，因为register0和bind0操作都是 eventloop线程，而eventloop现在在执行register0
                 if (isActive()) {
                     if (firstRegistration) {
                         pipeline.fireChannelActive();
@@ -540,6 +565,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
         }
 
+        /**
+         * 绑定操作
+         * @param localAddress
+         * @param promise
+         */
         @Override
         public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
             assertEventLoop();
@@ -563,6 +593,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             boolean wasActive = isActive();
             try {
+                // 获取JDK层面的ServerSocketChannel，完成真正的绑定工作
                 doBind(localAddress);
             } catch (Throwable t) {
                 safeSetFailure(promise, t);
@@ -570,15 +601,17 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 因为已经完成绑定操作了，所以为true
             if (!wasActive && isActive()) {
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {
+                        //
                         pipeline.fireChannelActive();
                     }
                 });
             }
-
+            // 设置绑定成功，唤醒sync()操作，
             safeSetSuccess(promise);
         }
 

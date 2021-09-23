@@ -87,6 +87,9 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
         return new DefaultThreadFactory(getClass(), Thread.MAX_PRIORITY);
     }
 
+    /**
+     * 最终调用的是EventExecutorChooser的方法 选择一个EventExecutor实例
+     */
     @Override
     public EventLoop next() {
         return (EventLoop) super.next();
@@ -97,6 +100,11 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
 
     @Override
     public ChannelFuture register(Channel channel) {
+        // next()方法从当前group内选择一个EventLoop对象返回
+        // EventLoop是一个单线程的线程池，并且内部拥有Selector实例
+        // EventLoop的作用1.处理EventLoop中工作队列内部任务
+        // 2.处理EventLoop内部 Selector 上注册的Channel事件、
+        // 参数channel 可能是NioServerSocketChannel，也有可能是NioSocketChannel
         return next().register(channel);
     }
 

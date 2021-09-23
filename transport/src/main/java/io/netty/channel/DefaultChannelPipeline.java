@@ -199,10 +199,12 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
         final AbstractChannelHandlerContext newCtx;
         synchronized (this) {
+            // 检查是否可以多个线程使用这个Handler    @Sharable
             checkMultiplicity(handler);
 
             newCtx = newContext(group, filterName(name, handler), handler);
 
+            // 将newCtx放到Head和tail之间
             addLast0(newCtx);
 
             // If the registered is false it means that the channel was not registered on an eventLoop yet.
@@ -1102,6 +1104,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
             // This Channel itself was registered.
             registered = true;
 
+            // 拿到单链表的头结点
             pendingHandlerCallbackHead = this.pendingHandlerCallbackHead;
             // Null out so it can be GC'ed.
             this.pendingHandlerCallbackHead = null;
@@ -1117,10 +1120,17 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         }
     }
 
+    /**
+     * 入队操作
+     *
+     * @param ctx
+     * @param added
+     */
     private void callHandlerCallbackLater(AbstractChannelHandlerContext ctx, boolean added) {
         assert !registered;
 
         PendingHandlerCallback task = added ? new PendingHandlerAddedTask(ctx) : new PendingHandlerRemovedTask(ctx);
+        // 单向链表 存储这些task对象  PendingHandlerCallback
         PendingHandlerCallback pending = pendingHandlerCallbackHead;
         if (pending == null) {
             pendingHandlerCallbackHead = task;

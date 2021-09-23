@@ -284,8 +284,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
 
+    /**
+     * 真正完成doBind的方法，很重要
+     */
     private ChannelFuture doBind(final SocketAddress localAddress) {
         // 创建Channel并初始化Channel
+        // 返回的regFuture就是 注册相关的promise对象，关联的异步任务是register0，最终是EventLoop这个线程去执行
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
         if (regFuture.cause() != null) {
@@ -301,6 +305,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         } else {
             // Registration future is almost always fulfilled already, but just in case it's not.
             final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
+            // 向register0任务 相关的promise添加一个回调对象，回调执行的线程是EventLoop线程
             regFuture.addListener(new ChannelFutureListener() {
                 @Override
                 public void operationComplete(ChannelFuture future) throws Exception {
@@ -328,7 +333,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
-            // 反射创建Channel对象
+            // 反射创建Channel对象，使用的是空参构造方法
             channel = channelFactory.newChannel();
             // 初始化Channel，具体实现由客户端和服务端的BootStrap实现
             init(channel);
@@ -345,6 +350,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
         // 将Channel注册到Boss线程组,Channel注册到Selector
         // boss线程组中的chooser来选择一个EventLoop
+        // 假如是服务端，config().group() 返回的就是Boss组的Group
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             // 注册失败了

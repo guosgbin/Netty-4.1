@@ -50,7 +50,9 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(AbstractNioChannel.class);
 
+    // JDK层面的Channel
     private final SelectableChannel ch;
+    // 感兴趣的事件
     protected final int readInterestOp;
     volatile SelectionKey selectionKey;
     boolean readPending;
@@ -373,11 +375,17 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         return loop instanceof NioEventLoop;
     }
 
+    /**
+     * 将JDK层面的Channel注册到未包装的Selector选择器上
+     * @throws Exception
+     */
     @Override
     protected void doRegister() throws Exception {
         boolean selected = false;
         for (;;) {
             try {
+                // javaChannel() 获得jdk层面的channel
+                // JDK层面的Selector
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {
@@ -400,6 +408,10 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         eventLoop().cancel(selectionKey());
     }
 
+    /**
+     * 设置感兴趣的事件为 accpet
+     * @throws Exception
+     */
     @Override
     protected void doBeginRead() throws Exception {
         // Channel.read() or ChannelHandlerContext.read() was called

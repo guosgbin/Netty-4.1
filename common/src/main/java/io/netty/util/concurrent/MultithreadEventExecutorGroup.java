@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public abstract class MultithreadEventExecutorGroup extends AbstractEventExecutorGroup {
 
     private final EventExecutor[] children;
+    // children变量的只读形式
     private final Set<EventExecutor> readonlyChildren;
     private final AtomicInteger terminatedChildren = new AtomicInteger();
     private final Promise<?> terminationFuture = new DefaultPromise(GlobalEventExecutor.INSTANCE);
@@ -82,15 +83,22 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
         checkPositive(nThreads, "nThreads");
 
         if (executor == null) {
-            // 创建一个
+            // 创建一个Executor执行器对象
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
         children = new EventExecutor[nThreads];
 
+        // 循环创建EventExecutor
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
+                /*
+                 * NioEventLoopGroup调用时参数为：
+                 *    args[0]是 SelectorProvider
+                 *    args[1]是 SelectStrategyFactory
+                 *    args[2]是 线程池拒绝策略
+                 */
                 children[i] = newChild(executor, args);
                 success = true;
             } catch (Exception e) {
@@ -118,6 +126,8 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         }
 
+        // 通过ChooserFactory根据当前Children的数量，构建一个合适的Chooser实例
+        // Chooser是用来选择NioEventLoop
         chooser = chooserFactory.newChooser(children);
 
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
@@ -129,6 +139,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         };
 
+        // 添加终止监听
         for (EventExecutor e: children) {
             e.terminationFuture().addListener(terminationListener);
         }

@@ -938,6 +938,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void startThread() {
         if (state == ST_NOT_STARTED) {
+            // 假如是线程未启动状态，使用CAS设置为线程启动状态
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
                 boolean success = false;
                 try {

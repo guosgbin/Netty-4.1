@@ -110,11 +110,13 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     /**
      * The NIO {@link Selector}.
+     * NIO的Selector
      */
     private Selector selector;
     private Selector unwrappedSelector;
     private SelectedSelectionKeySet selectedKeys;
 
+    // 选择器提供器
     private final SelectorProvider provider;
 
     private static final long AWAKE = -1L;
@@ -126,19 +128,33 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     //    other value T    when EL is waiting with wakeup scheduled at time T
     private final AtomicLong nextWakeupNanos = new AtomicLong(AWAKE);
 
+    // 选择器提供策略
     private final SelectStrategy selectStrategy;
 
     private volatile int ioRatio = 50;
     private int cancelledKeys;
     private boolean needsToSelectAgain;
 
+    // 参数一：当前NioEventLoopGroup
+    // 参数二：ThreadPerTaskExecutor
+    // 参数三：selectorProvider，选择器提供器
+    // 参数四：选择器工作策略 DefaultSelectStrategy
+    // 参数五：线程池拒绝策略
     NioEventLoop(NioEventLoopGroup parent, Executor executor, SelectorProvider selectorProvider,
                  SelectStrategy strategy, RejectedExecutionHandler rejectedExecutionHandler,
                  EventLoopTaskQueueFactory taskQueueFactory, EventLoopTaskQueueFactory tailTaskQueueFactory) {
+        // 参数一：当前NioEventLoopGroup
+        // 参数二：ThreadPerTaskExecutor, 是在Group中创建的
+        // 参数三：
+        // 参数四：最终返回的是一个队列，最大程度是Integer.MAX_VALUE，最小是16
+        // 参数五：大部分用不到这个queue
+        // 参数六：线程池拒绝策略
         super(parent, executor, false, newTaskQueue(taskQueueFactory), newTaskQueue(tailTaskQueueFactory),
                 rejectedExecutionHandler);
         this.provider = ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "selectStrategy");
+        // 创建包装后的Selector和未包装的Selector实例
+        // 也就是每个NioEventLoop都持有有一个Selector实例
         final SelectorTuple selectorTuple = openSelector();
         this.selector = selectorTuple.selector;
         this.unwrappedSelector = selectorTuple.unwrappedSelector;

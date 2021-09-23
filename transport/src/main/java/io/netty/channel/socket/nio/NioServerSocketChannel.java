@@ -75,6 +75,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance
      */
     public NioServerSocketChannel() {
+        // newSocket方法会返回一个JDK层面的ServerSocketChannel实例
         this(newSocket(DEFAULT_SELECTOR_PROVIDER));
     }
 
@@ -87,9 +88,10 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
 
     /**
      * Create a new instance using the given {@link ServerSocketChannel}.
+     * ServerSocketChannel是JDK层面的Channel
      */
     public NioServerSocketChannel(ServerSocketChannel channel) {
-        // 设置监听的事件为accept事件
+        // 因为是服务端Channel，所以设置监听的事件为accept事件，最终会注册到Selector选择器上
         super(null, channel, SelectionKey.OP_ACCEPT);
         // 创建通道配置对象
         config = new NioServerSocketChannelConfig(this, javaChannel().socket());

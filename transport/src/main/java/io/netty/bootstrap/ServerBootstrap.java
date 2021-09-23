@@ -129,6 +129,9 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         return this;
     }
 
+    /**
+     * 最主要的是 为了服务端的pipeline添加一个ChannelInitializer
+     */
     @Override
     void init(Channel channel) {
         // 设置自定义的option
@@ -136,19 +139,27 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         // 设置自定义的attribute
         setAttributes(channel, newAttributesArray());
 
-        // 获取已经分配的Pipeline管道
+        // 获取已经分配的服务端的Pipeline管道
         ChannelPipeline p = channel.pipeline();
 
+        // 其实就是再Demo里的workGroup
         final EventLoopGroup currentChildGroup = childGroup;
         final ChannelHandler currentChildHandler = childHandler;
+        // 客户端Socket选项
         final Entry<ChannelOption<?>, Object>[] currentChildOptions = newOptionsArray(childOptions);
+        // 客户端的Attribute参数
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = newAttributesArray(childAttrs);
 
-        // 再管道后面添加一个ChannelInitializer
+        // 再服务端管道后面添加一个ChannelInitializer
+        // ChannelInitializer本身不是一个Handler，只是通过Adapter实现了Handler接口
+        // 它存在的意义，就是为了延迟初始化Pipeline
+        // 目前管道是这个样子 head <--> ChannelInitializer <--> tail
         p.addLast(new ChannelInitializer<Channel>() {
+            // 这个initChannel会在 io.netty.channel.ChannelInitializer.handlerAdded处调用
             @Override
             public void initChannel(final Channel ch) {
                 final ChannelPipeline pipeline = ch.pipeline();
+                // 获得服务端配置的Handler
                 ChannelHandler handler = config.handler();
                 if (handler != null) {
                     pipeline.addLast(handler);
