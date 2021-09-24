@@ -281,11 +281,13 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
         long nanoTime = AbstractScheduledEventExecutor.nanoTime();
         for (;;) {
+            // 获取调度任务 优先级队列队首结点，可能返回null
             Runnable scheduledTask = pollScheduledTask(nanoTime);
             if (scheduledTask == null) {
                 return true;
             }
             if (!taskQueue.offer(scheduledTask)) {
+                // 普通队列放不下了，将任务重新返回到调度队列里去
                 // No space left in the task queue add it back to the scheduledTaskQueue so we pick it up again.
                 scheduledTaskQueue.add((ScheduledFutureTask<?>) scheduledTask);
                 return false;
@@ -370,11 +372,15 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         boolean ranAtLeastOne = false;
 
         do {
+            // 将调度任务队列中需要被调度的任务 转移到 普通任务队列中 taskQueue
+            // 返回值表示需要被调度的任务 有没有转移完毕
             fetchedAll = fetchFromScheduledTaskQueue();
             if (runAllTasksFrom(taskQueue)) {
                 ranAtLeastOne = true;
             }
         } while (!fetchedAll); // keep on processing until we fetched all scheduled tasks.
+
+        // 到此处表示 需要调度的任务和普通任务都执行完毕了
 
         if (ranAtLeastOne) {
             lastExecutionTime = ScheduledFutureTask.nanoTime();
@@ -455,6 +461,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * the tasks in the task queue and returns if it ran longer than {@code timeoutNanos}.
      */
     protected boolean runAllTasks(long timeoutNanos) {
+        // 转移调度任务到普通任务队列
         fetchFromScheduledTaskQueue();
         Runnable task = pollTask();
         if (task == null) {
@@ -462,8 +469,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             return false;
         }
 
+        // 表示执行任务的截止时间
         final long deadline = timeoutNanos > 0 ? ScheduledFutureTask.nanoTime() + timeoutNanos : 0;
+        // 已经执行任务的个数
         long runTasks = 0;
+        // 最后一个任务的执行时间
         long lastExecutionTime;
         for (;;) {
             safeExecute(task);
@@ -472,6 +482,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
             // Check timeout every 64 tasks because nanoTime() is relatively expensive.
             // XXX: Hard-coded value - will make it configurable if it is really a problem.
+            // 每隔64个任务去查看是否超时
             if ((runTasks & 0x3F) == 0) {
                 lastExecutionTime = ScheduledFutureTask.nanoTime();
                 if (lastExecutionTime >= deadline) {
@@ -821,9 +832,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     private void execute(Runnable task, boolean immediate) {
+        // 判断执行当前代码的线程是否是 eventloop的线程，是则true，否则fasle
         boolean inEventLoop = inEventLoop();
+        // 添加任务
         addTask(task);
         if (!inEventLoop) {
+            // 执行当前代码的线程不是eventloop线程，需要开启线程
             startThread();
             if (isShutdown()) {
                 boolean reject = false;
