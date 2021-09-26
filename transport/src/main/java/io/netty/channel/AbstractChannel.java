@@ -75,6 +75,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         id = newId();
         // 封装一个unsafe对象
         // 当Channel是NioServerSocketChannel时，Unsafe实例是NioMessageUnSafe
+        // 当Channel是NioSocketChannel时，实例是NioByteUnSafe
         unsafe = newUnsafe();
         // 构建Channel消息处理管道Pipeline
         // 设置好两个节点(默认的处理器)，一个头结点HeadContext，一个尾节点TailContext
@@ -547,6 +548,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 // NIoServerSocketChannel角度来说
                 // 这一步bind操作肯定没有完成，因为register0和bind0操作都是 eventloop线程，而eventloop现在在执行register0
                 if (isActive()) {
+                    // firstRegistration 客户端是true 服务端是false
                     if (firstRegistration) {
                         pipeline.fireChannelActive();
                     } else if (config().isAutoRead()) {

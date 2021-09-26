@@ -409,7 +409,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     }
 
     /**
-     * 设置感兴趣的事件为 accpet
+     * 设置感兴趣的事件
      * @throws Exception
      */
     @Override

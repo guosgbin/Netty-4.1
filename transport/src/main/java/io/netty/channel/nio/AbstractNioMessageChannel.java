@@ -66,8 +66,10 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
         @Override
         public void read() {
             assert eventLoop().inEventLoop();
+            // 服务端的config和pipeline
             final ChannelConfig config = config();
             final ChannelPipeline pipeline = pipeline();
+            // 控制读循环和预测下次创建的bytebuf的容量大小
             final RecvByteBufAllocator.Handle allocHandle = unsafe().recvBufAllocHandle();
             allocHandle.reset(config);
 
@@ -75,7 +77,9 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
             Throwable exception = null;
             try {
                 try {
+                    // 读消息循环
                     do {
+                        // 正常情况返回1
                         int localRead = doReadMessages(readBuf);
                         if (localRead == 0) {
                             break;
@@ -85,19 +89,25 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                             break;
                         }
 
+                        // 更新已读消息数量
                         allocHandle.incMessagesRead(localRead);
                     } while (continueReading(allocHandle));
                 } catch (Throwable t) {
                     exception = t;
                 }
 
+                // 执行到此处 readBuf里存的都是NioSocketChannel对象
+
                 int size = readBuf.size();
                 for (int i = 0; i < size; i ++) {
                     readPending = false;
+                    // 向服务端通道 传播每个客户端Channel对象
                     pipeline.fireChannelRead(readBuf.get(i));
                 }
+                // 清空
                 readBuf.clear();
                 allocHandle.readComplete();
+                // 重新设置Selector上当前Server key，让key包含Accept，就是让Selector继续帮Server监听accept事件
                 pipeline.fireChannelReadComplete();
 
                 if (exception != null) {

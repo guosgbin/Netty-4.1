@@ -63,6 +63,9 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
      * @param ch                the underlying {@link SelectableChannel} on which it operates
      */
     protected AbstractNioByteChannel(Channel parent, SelectableChannel ch) {
+        // 参数1 服务端channel
+        // 餐数2 原生客户端channel
+        // 参数3 是初始化事件
         super(parent, ch, SelectionKey.OP_READ);
     }
 
@@ -133,22 +136,31 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
         @Override
         public final void read() {
+            // 获取客户端的配置Config对象
             final ChannelConfig config = config();
             if (shouldBreakReadReady(config)) {
                 clearReadPending();
                 return;
             }
+            // 获取客户端的pipeline对象
             final ChannelPipeline pipeline = pipeline();
+            // 获取缓冲区分配器
             final ByteBufAllocator allocator = config.getAllocator();
+            // 控制读循环和预测下次创建的bytebuf的容量大小
             final RecvByteBufAllocator.Handle allocHandle = recvBufAllocHandle();
+            // 重置
             allocHandle.reset(config);
 
             ByteBuf byteBuf = null;
             boolean close = false;
             try {
                 do {
+                    // 参数是缓冲区内存分配器
+                    // allocHandle只是预测分配多大的内存
                     byteBuf = allocHandle.allocate(allocator);
+                    // doReadBytes(byteBuf) 读取当前Socket读缓冲区的数据到byteBuf对象中
                     allocHandle.lastBytesRead(doReadBytes(byteBuf));
+                    // channel底层Socket读缓冲区 已经完全读取完毕会返回0，或者是Channel对端关闭了 返回-1
                     if (allocHandle.lastBytesRead() <= 0) {
                         // nothing was read. release the buffer.
                         byteBuf.release();
@@ -161,8 +173,10 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                         break;
                     }
 
+                    // 更新缓冲区预测分配器 读取消息数量
                     allocHandle.incMessagesRead(1);
                     readPending = false;
+                    // 向客户端pipeline发送channelRead事件，该pipeline实现了channelRead的Handler就可以进行业务处理了
                     pipeline.fireChannelRead(byteBuf);
                     byteBuf = null;
                 } while (allocHandle.continueReading());
