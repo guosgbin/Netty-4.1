@@ -63,6 +63,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      */
     volatile EventLoopGroup group;
     @SuppressWarnings("deprecation")
+    // 构造channel的工厂
     private volatile ChannelFactory<? extends C> channelFactory;
     private volatile SocketAddress localAddress;
 

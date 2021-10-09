@@ -241,7 +241,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
             try {
                 // childGroup是worker线程组
-                // 注册：
+                // 注册： 将workerGroup中的某个EventLoop和NioSocketChannel进行关联
                 // 1.从worker组分配一个NioEventLoop给当前NioSocketChannel使用（NioEventLoop是多个Channel共享的）
                 // 完成底层SocketChannel注册到底层Selector
                 // 向NioSocketChannel通道发起Active事件，这个事件由head响应，head最终通过使用unsafe修改当前Channel的SelectionKey

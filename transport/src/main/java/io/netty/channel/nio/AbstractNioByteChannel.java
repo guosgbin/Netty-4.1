@@ -46,6 +46,10 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             " (expected: " + StringUtil.simpleClassName(ByteBuf.class) + ", " +
             StringUtil.simpleClassName(FileRegion.class) + ')';
 
+    // 负责刷新发送缓存链表中的数据
+    // write的数据没有直接写在Socket中，而是写在了ChannelOutBoundBuffer缓存区中
+    // 调flush方法会把数据写入Socket并向网络中发送。
+    // 当缓存中的数据未发送完成时，需要将此任务添加到EventLoop线程中，等待EventLoop线程的再次发送
     private final Runnable flushTask = new Runnable() {
         @Override
         public void run() {
@@ -266,18 +270,29 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
+        // 写请求自循环次数，默认16次
         int writeSpinCount = config().getWriteSpinCount();
         do {
+            // 获取当前Channel的缓存ChannelOutBoundBuffer中的当前待刷新消息
             Object msg = in.current();
+            // 所有消息都发送成功了
             if (msg == null) {
                 // Wrote all messages.
+                // 清除Channel选择Key兴趣事件的OP_WRITE写操作事件
                 clearOpWrite();
                 // Directly return here so incompleteWrite(...) is not called.
                 return;
             }
+            // 发送数据
             writeSpinCount -= doWriteInternal(in, msg);
         } while (writeSpinCount > 0);
 
+        /*
+         * 当因为缓存区满了而发送失败时
+         * doWriteInternal返回Integer.MAX_VALUE
+         * 此时writeSpinCount < 0为true，当发送16次还未全部发送完，但每次都写成功
+         * writeSpinCount为0
+         */
         incompleteWrite(writeSpinCount < 0);
     }
 

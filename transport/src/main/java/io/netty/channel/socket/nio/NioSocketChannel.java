@@ -58,6 +58,12 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioSocketChannel.class);
     private static final SelectorProvider DEFAULT_SELECTOR_PROVIDER = SelectorProvider.provider();
 
+    /**
+     * 创建JDK原生的SocketChannel
+     *
+     * @param provider
+     * @return
+     */
     private static SocketChannel newSocket(SelectorProvider provider) {
         try {
             /**
@@ -312,6 +318,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
 
         boolean success = false;
         try {
+            // 获取JDK层面的SocketChannel，进行连接
             boolean connected = SocketUtils.connect(javaChannel(), remoteAddress);
             if (!connected) {
                 selectionKey().interestOps(SelectionKey.OP_CONNECT);

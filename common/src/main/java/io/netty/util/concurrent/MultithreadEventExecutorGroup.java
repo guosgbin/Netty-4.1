@@ -83,17 +83,18 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
         checkPositive(nThreads, "nThreads");
 
         if (executor == null) {
-            // 创建一个Executor执行器对象
+            // 创建一个Executor执行器对象和线程工厂
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
         children = new EventExecutor[nThreads];
 
-        // 循环创建EventExecutor
+        // 根据线程数循环创建EventExecutor
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
                 /*
+                 * 模板方法模式: 初始化线程组的线程
                  * NioEventLoopGroup调用时参数为：
                  *    args[0]是 SelectorProvider
                  *    args[1]是 SelectStrategyFactory
@@ -105,6 +106,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
                 // TODO: Think about if this is a good exception type
                 throw new IllegalStateException("failed to create a child event loop", e);
             } finally {
+                // 假如初始化关闭失败，需要优雅的关闭，清理资源
                 if (!success) {
                     for (int j = 0; j < i; j ++) {
                         children[j].shutdownGracefully();
@@ -113,6 +115,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
                     for (int j = 0; j < i; j ++) {
                         EventExecutor e = children[j];
                         try {
+                            // 当线程没有终止时，等待终止
                             while (!e.isTerminated()) {
                                 e.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
                             }
@@ -139,13 +142,14 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         };
 
-        // 添加终止监听
+        // 为每个EventLoop线程添加添加线程终止监听
         for (EventExecutor e: children) {
             e.terminationFuture().addListener(terminationListener);
         }
 
         Set<EventExecutor> childrenSet = new LinkedHashSet<EventExecutor>(children.length);
         Collections.addAll(childrenSet, children);
+        // 执行器只读副本
         readonlyChildren = Collections.unmodifiableSet(childrenSet);
     }
 

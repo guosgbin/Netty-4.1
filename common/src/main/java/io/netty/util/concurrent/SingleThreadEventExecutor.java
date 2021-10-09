@@ -461,8 +461,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * the tasks in the task queue and returns if it ran longer than {@code timeoutNanos}.
      */
     protected boolean runAllTasks(long timeoutNanos) {
-        // 转移调度任务到普通任务队列
+        // 从定时任务队列中将达到执行事件的task转移到taskQueue队列中
         fetchFromScheduledTaskQueue();
+        // 从taskQueue中获取task
         Runnable task = pollTask();
         if (task == null) {
             afterRunningAllTasks();
@@ -490,6 +491,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 }
             }
 
+            // 从taskQueue队列中获取task，假如没有task了，则更新最后执行时间，并跳出循环
             task = pollTask();
             if (task == null) {
                 lastExecutionTime = ScheduledFutureTask.nanoTime();
@@ -831,6 +833,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         execute(ObjectUtil.checkNotNull(task, "task"), false);
     }
 
+    /**
+     * 创建线程，将线程添加到EventLoop的无锁化串行任务队列
+     *
+     * @param task
+     * @param immediate
+     */
     private void execute(Runnable task, boolean immediate) {
         // 判断执行当前代码的线程是否是 eventloop的线程，是则true，否则fasle
         boolean inEventLoop = inEventLoop();

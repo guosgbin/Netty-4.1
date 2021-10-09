@@ -197,6 +197,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             return new SelectorTuple(unwrappedSelector);
         }
 
+        // 使用反射机制，获取JDK底层的Selector的Class对象
         Object maybeSelectorImplClass = AccessController.doPrivileged(new PrivilegedAction<Object>() {
             @Override
             public Object run() {
@@ -229,6 +230,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             @Override
             public Object run() {
                 try {
+                    // 通过反射获取selectedKeys和publicSelectedKeys两个字段
                     Field selectedKeysField = selectorImplClass.getDeclaredField("selectedKeys");
                     Field publicSelectedKeysField = selectorImplClass.getDeclaredField("publicSelectedKeys");
 
@@ -258,6 +260,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         return cause;
                     }
 
+                    // 将上面获取的两个属性重新赋值为Netty的SelectedSelectionKeySet
                     selectedKeysField.set(unwrappedSelector, selectedKeySet);
                     publicSelectedKeysField.set(unwrappedSelector, selectedKeySet);
                     return null;
@@ -388,6 +391,11 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         return selector.keys().size() - cancelledKeys;
     }
 
+    /**
+     * 1.创建一个新的Selector
+     * 2.将原来的Selector中注册的事件全部取消
+     * 3.将可用事件重新注册到新的Selector并激活
+     */
     private void rebuildSelector0() {
         final Selector oldSelector = selector;
         final SelectorTuple newSelectorTuple;
@@ -397,6 +405,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
 
         try {
+            // 开启新的Selector
             newSelectorTuple = openSelector();
         } catch (Exception e) {
             logger.warn("Failed to create a new Selector.", e);
@@ -405,6 +414,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
         // Register all channels to the new Selector.
         int nChannels = 0;
+        // 遍历旧的Selector上的key
         for (SelectionKey key: oldSelector.keys()) {
             Object a = key.attachment();
             try {
@@ -412,8 +422,10 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                     continue;
                 }
 
+                // 取消旧的Selector上触发的事件
                 int interestOps = key.interestOps();
                 key.cancel();
+                // 把Channel注册到新的Selector上
                 SelectionKey newKey = key.channel().register(newSelectorTuple.unwrappedSelector, interestOps, a);
                 if (a instanceof AbstractNioChannel) {
                     // Update SelectionKey
@@ -438,6 +450,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
         try {
             // time to close the old selector as everything else is registered to the new one
+            // 关闭旧的Selector
             oldSelector.close();
         } catch (Throwable t) {
             if (logger.isWarnEnabled()) {
@@ -450,6 +463,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+    /**
+     * 死循环 不断的轮询 SelectionKey
+     */
     @Override
     protected void run() {
         // epoll bug的一个特征计数变量
@@ -462,7 +478,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 try {
                     // 根据当前NioEventLoop是否有任务，来判断
                     // 1.有任务，调用Selector的selectNow()方法，返回就绪事件的个数
-                    // 2.没有任务，直接返回SELECT
+                    // 2.没有任务，直接返回SELECT 也就是-1
                     strategy = selectStrategy.calculateStrategy(selectNowSupplier, hasTasks());
                     switch (strategy) {
                     case SelectStrategy.CONTINUE:
@@ -497,6 +513,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 } catch (IOException e) {
                     // If we receive an IOException here its because the Selector is messed up. Let's rebuild
                     // the selector and retry. https://github.com/netty/netty/issues/8566
+                    // 出现I/O异常时重新构建Selector
                     rebuildSelector0();
                     selectCnt = 0;
                     handleLoopException(e);
@@ -536,7 +553,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         // Ensure we always run tasks.
                         // IO事件处理总耗时
                         final long ioTime = System.nanoTime() - ioStartTime;
-                        // 计算执行本地队列任务的最大时间，根据ioRatio
+                        // 计算执行本地队列任务的最大时间，根据ioRatio，有可能遗留一部分任务等待下次执行
                         ranTasks = runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
                     }
                 }
@@ -627,9 +644,12 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     private void processSelectedKeys() {
+        // 判断优化后的selectedKeys是否为空
         if (selectedKeys != null) {
+            // 优化处理
             processSelectedKeysOptimized();
         } else {
+            // 原始处理
             processSelectedKeysPlain(selector.selectedKeys());
         }
     }
@@ -698,13 +718,14 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             final SelectionKey k = selectedKeys.keys[i];
             // null out entry in the array to allow to have it GC'ed once the Channel close
             // See https://github.com/netty/netty/issues/2363
+            // 先将selectedKeys.keys[i]置空，快速GC，不需要等到调用其重置再去回收，因为key的附件比较大，很容易造成内存泄露
             selectedKeys.keys[i] = null;
 
             // 附件，这里会拿到注册时向Selector提供的Channel对象
             final Object a = k.attachment();
 
             if (a instanceof AbstractNioChannel) {
-                // 处理IO事件
+                // 处理IO事件，根据key的就绪事件触发对应的事件方法
                 processSelectedKey(k, (AbstractNioChannel) a);
             } else {
                 @SuppressWarnings("unchecked")
@@ -712,6 +733,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 processSelectedKey(k, task);
             }
 
+            // 判断是否应该再次轮询，每当256个channel从selector上移除时，就标记needsToSelectAgain为true
             if (needsToSelectAgain) {
                 // null out entries in the array to allow to have it GC'ed once the Channel close
                 // See https://github.com/netty/netty/issues/2363

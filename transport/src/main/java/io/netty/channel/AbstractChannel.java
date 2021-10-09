@@ -45,14 +45,18 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannel.class);
 
     private final Channel parent;
+    // 全局唯一的ID
     private final ChannelId id;
+    // 实现具体的连接的读/写数据
     private final Unsafe unsafe;
+    // Handler链  事件驱动
     private final DefaultChannelPipeline pipeline;
     private final VoidChannelPromise unsafeVoidPromise = new VoidChannelPromise(this, false);
     private final CloseFuture closeFuture = new CloseFuture(this);
 
     private volatile SocketAddress localAddress;
     private volatile SocketAddress remoteAddress;
+    // 每个Channel对应一个EventLoop线程
     private volatile EventLoop eventLoop;
     // 是否已经注册过
     private volatile boolean registered;
@@ -71,7 +75,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected AbstractChannel(Channel parent) {
         this.parent = parent;
-        // 给Channel实例分配一个ID对象
+        // 给Channel实例分配一个唯一的ID对象
         id = newId();
         // 封装一个unsafe对象
         // 当Channel是NioServerSocketChannel时，Unsafe实例是NioMessageUnSafe

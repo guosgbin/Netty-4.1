@@ -207,7 +207,7 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
         // 参数一：当前NioEventLoopGroup
         // 参数二：ThreadPerTaskExecutor
         // 参数三：selectorProvider，选择器提供器
-        // 参数四：选择器工作策略 DefaultSelectStrategy
+        // 参数四：选择器工作策略 DefaultSelectStrategy  再NIoEventLoop的run()方法中用于控制选择循环
         // 参数五：线程池拒绝策略
         // 参数六和七：一般正常情况下是null，除非argsLength > 3，或者argsLength > 4
         return new NioEventLoop(this, executor, selectorProvider,

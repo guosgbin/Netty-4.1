@@ -44,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Abstract base class for {@link Channel} implementations which use a Selector based approach.
+ * 该层抽象 将Netty的channel和Java NIO的Channel关联起来了
  */
 public abstract class AbstractNioChannel extends AbstractChannel {
 
@@ -54,6 +55,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     private final SelectableChannel ch;
     // 感兴趣的事件
     protected final int readInterestOp;
+    // 注册到Selector后获取的key
     volatile SelectionKey selectionKey;
     boolean readPending;
     private final Runnable clearReadPendingRunnable = new Runnable() {
@@ -237,11 +239,13 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         @Override
         public final void connect(
                 final SocketAddress remoteAddress, final SocketAddress localAddress, final ChannelPromise promise) {
+            // 设置任务为不可取消状态，并确定Channel已经打开
             if (!promise.setUncancellable() || !ensureOpen(promise)) {
                 return;
             }
 
             try {
+                // 确保没有正在进行的连接
                 if (connectPromise != null) {
                     // Already a connect in process.
                     throw new ConnectionPendingException();
@@ -392,6 +396,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                 if (!selected) {
                     // Force the Selector to select now as the "canceled" SelectionKey may still be
                     // cached and not removed because no Select.select(..) operation was called yet.
+                    // 因为还没有调用Select.select(..)，有可能仍然存在缓存而未删除但已取消的selectionKey
+                    // 强制调用selectNow()方法将已经取消的SelectionKey从Selector上删除
                     eventLoop().selectNow();
                     selected = true;
                 } else {
