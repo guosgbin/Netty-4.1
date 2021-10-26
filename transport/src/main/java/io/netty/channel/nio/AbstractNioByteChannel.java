@@ -152,7 +152,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             final ByteBufAllocator allocator = config.getAllocator();
             // 控制读循环和预测下次创建的bytebuf的容量大小
             final RecvByteBufAllocator.Handle allocHandle = recvBufAllocHandle();
-            // 重置
+            // 清空上一次读取的字节数，每次读取时搜重新计算
             allocHandle.reset(config);
 
             ByteBuf byteBuf = null;
@@ -185,7 +185,9 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                     byteBuf = null;
                 } while (allocHandle.continueReading());
 
+                // 读取操作完毕
                 allocHandle.readComplete();
+                // 触发管道的fireChannelReadComplete事件
                 pipeline.fireChannelReadComplete();
 
                 if (close) {
@@ -200,6 +202,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 // * The user called Channel.read() or ChannelHandlerContext.read() in channelReadComplete(...) method
                 //
                 // See https://github.com/netty/netty/issues/2254
+                // 假如读操作完毕，且没有配置自动读，则从选择的Key兴趣集中移除读操作事件
                 if (!readPending && !config.isAutoRead()) {
                     removeReadOp();
                 }
@@ -290,8 +293,8 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         /*
          * 当因为缓存区满了而发送失败时
          * doWriteInternal返回Integer.MAX_VALUE
-         * 此时writeSpinCount < 0为true，当发送16次还未全部发送完，但每次都写成功
-         * writeSpinCount为0
+         * 此时writeSpinCount < 0为true，
+         * 当发送16次还未全部发送完，但每次都写成功,writeSpinCount为0
          */
         incompleteWrite(writeSpinCount < 0);
     }

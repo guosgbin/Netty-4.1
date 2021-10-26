@@ -149,6 +149,13 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         javaChannel().close();
     }
 
+    /**
+     * 监听新连接
+     *
+     * @param buf
+     * @return
+     * @throws Exception
+     */
     @Override
     protected int doReadMessages(List<Object> buf) throws Exception {
         // 参数是JDK层面的ServerSocketChannel
@@ -157,7 +164,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
 
         try {
             if (ch != null) {
-                // 包装成了Netty封装的 客户端Channel
+                // 每次新连接都会创建一个NioSocketChannel
                 buf.add(new NioSocketChannel(this, ch));
                 return 1;
             }

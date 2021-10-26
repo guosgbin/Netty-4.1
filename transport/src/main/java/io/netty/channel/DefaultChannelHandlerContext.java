@@ -23,6 +23,10 @@ final class DefaultChannelHandlerContext extends AbstractChannelHandlerContext {
 
     DefaultChannelHandlerContext(
             DefaultChannelPipeline pipeline, EventExecutor executor, String name, ChannelHandler handler) {
+        // 参数1：当前ctx所属的pipeline
+        // 参数2：执行器，
+        // 参数3：名字
+        // 参数4：ctx封装的handler的字节码对象
         super(pipeline, executor, name, handler.getClass());
         this.handler = handler;
     }

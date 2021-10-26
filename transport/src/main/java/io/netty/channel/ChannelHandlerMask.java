@@ -54,12 +54,23 @@ final class ChannelHandlerMask {
     static final int MASK_WRITE = 1 << 15;
     static final int MASK_FLUSH = 1 << 16;
 
+    // 计算入站事件掩码
+    // 0000 0000 0000 0000 0000 0001 1111 1110
     static final int MASK_ONLY_INBOUND =  MASK_CHANNEL_REGISTERED |
             MASK_CHANNEL_UNREGISTERED | MASK_CHANNEL_ACTIVE | MASK_CHANNEL_INACTIVE | MASK_CHANNEL_READ |
             MASK_CHANNEL_READ_COMPLETE | MASK_USER_EVENT_TRIGGERED | MASK_CHANNEL_WRITABILITY_CHANGED;
+
+    // 计算入站事件的掩码，包含 MASK_EXCEPTION_CAUGHT
+    // 0000 0000 0000 0000 0000 0001 1111 1111
     private static final int MASK_ALL_INBOUND = MASK_EXCEPTION_CAUGHT | MASK_ONLY_INBOUND;
+
+    // 计算出出站事件的掩码
+    // 0000 0000 0000 0001 1111 1110 0000 0000
     static final int MASK_ONLY_OUTBOUND =  MASK_BIND | MASK_CONNECT | MASK_DISCONNECT |
             MASK_CLOSE | MASK_DEREGISTER | MASK_READ | MASK_WRITE | MASK_FLUSH;
+
+    // 计算出出站事件的掩码 包含 MASK_EXCEPTION_CAUGHT
+    // 0000 0000 0000 0001 1111 1110 0000 0001
     private static final int MASK_ALL_OUTBOUND = MASK_EXCEPTION_CAUGHT | MASK_ONLY_OUTBOUND;
 
     private static final FastThreadLocal<Map<Class<? extends ChannelHandler>, Integer>> MASKS =
@@ -87,14 +98,29 @@ final class ChannelHandlerMask {
 
     /**
      * Calculate the {@code executionMask}.
+     * 返回值是一个int类型的 二进制
+     * 对应下标位 代表指定方法 位的值是1，表示方法handlerType类型中实现了该方法
+     * 位置是0表示handlerType类型中 没有实现该方法
      */
     private static int mask0(Class<? extends ChannelHandler> handlerType) {
+        // 0000 0000 0000 0000 0000 0000 0000 0001
         int mask = MASK_EXCEPTION_CAUGHT;
         try {
+            // 条件成立 说明handlerType类型是属于ChannelInBoundHandler的子类
             if (ChannelInboundHandler.class.isAssignableFrom(handlerType)) {
+                // 结果 0000 0000 0000 0000 0000 0001 1111 1111
                 mask |= MASK_ALL_INBOUND;
 
+                // 参数1：handler的真实class类型
+                // 参数2：检查的方法名
+                // 参数3：ChannelHandlerContext.class
+                // isSkippable返回handlerType这个class 有没有重写指定的方法，重写之后指定方法上的Skip注解就没有了
+                // 条件成立，说明没有重写该方法
                 if (isSkippable(handlerType, "channelRegistered", ChannelHandlerContext.class)) {
+                    //     0000 0000 0000 0000 0000 0001 1111 1111
+                    // 取反 1111 1111 1111 1111 1111 1111 1111 1101
+                    // &   0000 0000 0000 0000 0000 0001 1111 1101
+                    // 也就是说 假如你自己实现了这些方法 该位置就是1，没有实现该方法 该位置就是0
                     mask &= ~MASK_CHANNEL_REGISTERED;
                 }
                 if (isSkippable(handlerType, "channelUnregistered", ChannelHandlerContext.class)) {
@@ -163,6 +189,9 @@ final class ChannelHandlerMask {
         return mask;
     }
 
+    // 参数1：handler的真实class类型
+    // 参数2：检查的方法名
+    // 参数3：ChannelHandlerContext.class
     @SuppressWarnings("rawtypes")
     private static boolean isSkippable(
             final Class<?> handlerType, final String methodName, final Class<?>... paramTypes) throws Exception {

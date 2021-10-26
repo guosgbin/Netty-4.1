@@ -210,12 +210,16 @@ public class DefaultChannelPipeline implements ChannelPipeline {
             // If the registered is false it means that the channel was not registered on an eventLoop yet.
             // In this case we add the context to the pipeline and add a task that will call
             // ChannelHandler.handlerAdded(...) once the channel is registered.
+            // 如果 registered是false则表示Channel还未注册到EventLoop上去
+            // 此时会添加ctx到pipeline，然后添加一个任务去ChannelHandler.handlerAdded(...)
             if (!registered) {
                 newCtx.setAddPending();
+                // 添加一个任务
                 callHandlerCallbackLater(newCtx, true);
                 return this;
             }
 
+            // 执行到这里，说明添加的ChannelHanddler已经完成了注册
             EventExecutor executor = newCtx.executor();
             if (!executor.inEventLoop()) {
                 callHandlerAddedInEventLoop(newCtx, executor);
@@ -455,6 +459,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         assert ctx != head && ctx != tail;
 
         synchronized (this) {
+            // 将ctx从双向链表中移除
             atomicRemoveFromHandlerList(ctx);
 
             // If the registered is false it means that the channel was not registered on an eventloop yet.
@@ -476,6 +481,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 return ctx;
             }
         }
+        // 调用handlerRemove方法
         callHandlerRemoved0(ctx);
         return ctx;
     }
