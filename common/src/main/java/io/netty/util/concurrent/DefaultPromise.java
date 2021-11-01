@@ -626,6 +626,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
      */
     private synchronized boolean checkNotifyWaiters() {
         if (waiters > 0) {
+            logger.warn("唤醒所有的listeners, listeners个数:{}个", waiters);
             notifyAll();
         }
         return listeners != null;

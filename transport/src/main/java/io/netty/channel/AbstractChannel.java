@@ -495,6 +495,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             // 绑定Channel和EventLoop的关系
             // 后续Channel上的事件或者任务都会用这个EventLoop线程去处理
+            logger.warn("开始绑定EventLoop 和 Channel, Channel类型: {}", eventLoop.getClass().getSimpleName());
             AbstractChannel.this.eventLoop = eventLoop;
 
             // 当前线程是否是当前EventLoop线程自己
@@ -546,6 +547,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 // 设置promise结果为成功，notifyAll等待的线程，回调注册相关的promise的Listener
                 safeSetSuccess(promise);
                 // 向当前Channel的pipeline发起一个 注册完成时间， 关注的handlder可以做一些自己的事情
+                logger.warn("Channel: {} 注册到Selector完成, 发布ChannelRegistered事件...", promise.channel().getClass().getSimpleName());
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
@@ -609,6 +611,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             // 因为已经完成绑定操作了，所以为true
             if (!wasActive && isActive()) {
+                logger.warn("服务端已经启动完成了，调用管道fireChannelActive方法，发布Active事件");
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {

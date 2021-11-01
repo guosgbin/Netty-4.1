@@ -215,6 +215,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
             if (!registered) {
                 newCtx.setAddPending();
                 // 添加一个任务
+                logger.warn("由于此时Channel和EventLoop还未绑定, 所以会创建一个任务到pendingHandlerCallbackHead单链表中");
                 callHandlerCallbackLater(newCtx, true);
                 return this;
             }
@@ -1120,6 +1121,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         // holding the lock and so produce a deadlock if handlerAdded(...) will try to add another handler from outside
         // the EventLoop.
         PendingHandlerCallback task = pendingHandlerCallbackHead;
+        logger.warn("遍历pendingHandlerCallbackHead单链表，拿到任务去执行任务...");
         while (task != null) {
             task.execute();
             task = task.next;

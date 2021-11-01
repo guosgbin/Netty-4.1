@@ -83,6 +83,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
         super(parent);
         this.ch = ch;
+        logger.warn("创建Channel, {} 赋值监听事件: {}, ps.注意此时只是将监听事件赋值到readInterestOp字段", ch.getClass().getSimpleName(), readInterestOp);
         this.readInterestOp = readInterestOp;
         try {
             // Channel设置为非阻塞模式
@@ -390,6 +391,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             try {
                 // javaChannel() 获得jdk层面的channel
                 // JDK层面的Selector
+                logger.warn("将JDK层面Channel: {} 注册到JDK层面 Selector: {}. 关注事件: {}, 附件就是当前Channel: {}",
+                        javaChannel().getClass().getSimpleName(), eventLoop().unwrappedSelector().getClass().getSimpleName(), 0, this.getClass().getSimpleName());
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {

@@ -154,6 +154,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         // ChannelInitializer本身不是一个Handler，只是通过Adapter实现了Handler接口
         // 它存在的意义，就是为了延迟初始化Pipeline
         // 目前管道是这个样子 head <--> ChannelInitializer <--> tail
+        logger.warn("添加服务端匿名对象 ChannelInitializer到服务端Pipeline...");
         p.addLast(new ChannelInitializer<Channel>() {
             // 这个initChannel会在 io.netty.channel.ChannelInitializer.handlerAdded处调用
             @Override
@@ -162,9 +163,11 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
                 // 获得服务端配置的Handler
                 ChannelHandler handler = config.handler();
                 if (handler != null) {
+                    logger.warn("匿名ChannelInitializer的initChannel方法:添加服务端配置的自定义Handler...");
                     pipeline.addLast(handler);
                 }
 
+                logger.warn("匿名ChannelInitializer的initChannel方法:添加Runnable任务,任务目的是添加ServerBootstrapAcceptor...");
                 ch.eventLoop().execute(new Runnable() {
                     @Override
                     public void run() {
@@ -173,6 +176,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
                         // 参数3：初始化客户端channel的Handler
                         // 参数4：参数
                         // 参数5：参数
+                        logger.warn("开始添加ServerBootstrapAcceptor...");
                         pipeline.addLast(new ServerBootstrapAcceptor(
                                 ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
                     }
