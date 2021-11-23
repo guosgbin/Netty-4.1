@@ -16,6 +16,7 @@
 package io.netty.example.echo;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -72,6 +73,7 @@ public final class EchoClient {
 
             // Start the client.
             ChannelFuture f = b.connect(HOST, PORT).sync();
+            Channel channel = f.channel();
 
             // Wait until the connection is closed.
             f.channel().closeFuture().sync();

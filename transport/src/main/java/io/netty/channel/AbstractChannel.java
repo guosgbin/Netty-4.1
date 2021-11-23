@@ -556,6 +556,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 if (isActive()) {
                     // firstRegistration 客户端是true 服务端是false
                     if (firstRegistration) {
+                        logger.warn("发布fireChannelActive事件...");
                         pipeline.fireChannelActive();
                     } else if (config().isAutoRead()) {
                         // This channel was registered before and autoRead() is set. This means we need to begin read
