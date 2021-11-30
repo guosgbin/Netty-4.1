@@ -303,10 +303,12 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
     protected final Object filterOutboundMessage(Object msg) {
         if (msg instanceof ByteBuf) {
             ByteBuf buf = (ByteBuf) msg;
+            // 是堆外直接返回
             if (buf.isDirect()) {
                 return msg;
             }
 
+            // 转换为direct返回
             return newDirectBuffer(buf);
         }
 
@@ -321,6 +323,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
     protected final void incompleteWrite(boolean setOpWrite) {
         // Did not write completely.
         if (setOpWrite) {
+            // 没有写完，设置 OP_WRITE 事件
             setOpWrite();
         } else {
             // It is possible that we have set the write OP, woken up by NIO because the socket is writable, and then
@@ -330,6 +333,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             clearOpWrite();
 
             // Schedule flush again later so other tasks can be picked up in the meantime
+            // 调用任务是，因为防止多路复用器上的其他 Channel饥饿，
             eventLoop().execute(flushTask);
         }
     }

@@ -439,6 +439,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected abstract class AbstractUnsafe implements Unsafe {
 
+        // 出站缓冲区 每个Channel都有一个Unsafe，每个Unsafe有一个ChannelOutboundBuffer
         private volatile ChannelOutboundBuffer outboundBuffer = new ChannelOutboundBuffer(AbstractChannel.this);
         private RecvByteBufAllocator.Handle recvHandle;
         private boolean inFlush0;
@@ -914,6 +915,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
             if (outboundBuffer == null) {
+                // 引用计数
                 try {
                     // release message now to prevent resource-leak
                     ReferenceCountUtil.release(msg);
@@ -928,9 +930,12 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // msg数据大小
             int size;
             try {
+                // msg一般是ByteBuf对象，该对象根据内存归属分为Heap和Direct，如果ByteBuf类型是Heap类型的话，这里会将其转换为direct类型
                 msg = filterOutboundMessage(msg);
+                // 获取当前消息 有效数据量大小
                 size = pipeline.estimatorHandle().size(msg);
                 if (size < 0) {
                     size = 0;
@@ -944,6 +949,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 将ByteBuf数据加入到出站缓存区内
+            // 参数1：msg 一般ByteBuf对象，direct堆外内存
+            // 参数2：size 数据量大小
             outboundBuffer.addMessage(msg, size, promise);
         }
 
@@ -956,6 +964,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 预准备刷新工作
+            // 将flushedEntry指向第一个需要刷新的entry节点
+            // 计算出 flushedEntry --> taiLEntry 之间总共有多少个entry待刷新，值赋值到flushed字段内
             outboundBuffer.addFlush();
             flush0();
         }
@@ -972,6 +983,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 表示当前Channel正在执行刷新工作
             inFlush0 = true;
 
             // Mark all pending write requests as failure if the channel is inactive.
@@ -993,6 +1005,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             try {
+                // 正常逻辑 执行此处
                 doWrite(outboundBuffer);
             } catch (Throwable t) {
                 handleWriteError(t);

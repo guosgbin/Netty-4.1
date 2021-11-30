@@ -453,16 +453,21 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * but just returns the original {@link ByteBuf}..
      */
     protected final ByteBuf newDirectBuffer(ByteBuf buf) {
+        // 当前ByteBuf可读数据量
         final int readableBytes = buf.readableBytes();
         if (readableBytes == 0) {
             ReferenceCountUtil.safeRelease(buf);
             return Unpooled.EMPTY_BUFFER;
         }
 
+        // 内存分配器
         final ByteBufAllocator alloc = alloc();
         if (alloc.isDirectBufferPooled()) {
+            // 根据可读数据量 分配堆外内存ByteBuf对象
             ByteBuf directBuf = alloc.directBuffer(readableBytes);
+            // 拷贝到堆外BYteBuf对象
             directBuf.writeBytes(buf, buf.readerIndex(), readableBytes);
+            // 释放堆内ByteBuf
             ReferenceCountUtil.safeRelease(buf);
             return directBuf;
         }
@@ -475,6 +480,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         }
 
         // Allocating and deallocating an unpooled direct buffer is very expensive; give up.
+        // 分配对外内存成本太高，放弃转换，直接返回原始buf
         return buf;
     }
 
