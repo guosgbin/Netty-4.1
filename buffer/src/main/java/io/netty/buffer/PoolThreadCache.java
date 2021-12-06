@@ -141,6 +141,8 @@ final class PoolThreadCache {
 
     // val > 0
     static int log2(int val) {
+        // 31 - 7(chunkSize二进制前面0的个数) = 24
+        // chunkSize默认16MiB 1后面24个0
         return INTEGER_SIZE_MINUS_ONE - Integer.numberOfLeadingZeros(val);
     }
 

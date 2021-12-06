@@ -25,14 +25,16 @@ import static io.netty.buffer.PoolThreadCache.*;
  *   LOG2_MAX_LOOKUP_SIZE: Log of max size class in the lookup table.
  *   sizeClasses: Complete table of [index, log2Group, log2Delta, nDelta, isMultiPageSize,
  *                 isSubPage, log2DeltaLookup] tuples.
- *     index: Size class index.
- *     log2Group: Log of group base size (no deltas added).
- *     log2Delta: Log of delta to previous size class.
- *     nDelta: Delta multiplier.
+ *     index: Size class index.表示每个size类型的索引
+ *     log2Group: Log of group base size (no deltas added).表示的对应size的对应的组，用于计算对应的size
+ *     log2Delta: Log of delta to previous size class. 表示的是和上一个sizeClass的差值的log2值，其实就是Dsize的log2值
+ *     nDelta: Delta multiplier.表示的是这一组中的delta乘值
  *     isMultiPageSize: 'yes' if a multiple of the page size, 'no' otherwise.
+ *                      表示的是这个size是否是page的倍数(这个表格的一个page的大小是1kB,故是1kB的倍数的size即为1)
  *     isSubPage: 'yes' if a subpage size class, 'no' otherwise.
+ *              表示其是否为一个subPage类型(即这种类型的size需要利用subPage进行分配)
  *     log2DeltaLookup: Same as log2Delta if a lookup table size class, 'no'
- *                      otherwise.
+ *                      otherwise.表示的是lookup的size的值即为log2Delata值，其它时间则为0（代码中没看到具体用处）
  * <p>
  *   nSubpages: Number of subpages size classes.
  *   nSizes: Number of size classes.
@@ -78,6 +80,13 @@ import static io.netty.buffer.PoolThreadCache.*;
  * <p>
  *   ( 76,    24,       22,        1,       yes,            no,        no)
  */
+
+/**
+ * netty中SizeClasses是PoolArena的父类，
+ * 其主要是根据pageSize,chunkSize等信息根据上面的规则生成对应的size的表格，并提供索引到size，size到索引的映射等功能
+ * 以便其他组件PoolChunk,PoolArena,PoolSubPage等判断其是否为subPage,
+ * 以及利用size和索引的映射关系来建立索引相关的池表示每种size的对应的池。
+ */
 abstract class SizeClasses implements SizeClassesMetric {
 
     static final int LOG2_QUANTUM = 4;
@@ -96,15 +105,21 @@ abstract class SizeClasses implements SizeClassesMetric {
     private static final byte no = 0, yes = 1;
 
     protected SizeClasses(int pageSize, int pageShifts, int chunkSize, int directMemoryCacheAlignment) {
+        // 页内存大小 默认8k
         this.pageSize = pageSize;
+        // 默认13
         this.pageShifts = pageShifts;
+        // 默认16mb
         this.chunkSize = chunkSize;
+        // 主要是对于Huge这种直接分配的类型的数据将其对其为directMemoryCacheAlignment的倍数
         this.directMemoryCacheAlignment = directMemoryCacheAlignment;
 
+        // 计算出group的数量 24 + 1 - 4 = 21
         int group = log2(chunkSize) + 1 - LOG2_QUANTUM;
 
         //generate size classes
         //[index, log2Group, log2Delta, nDelta, isMultiPageSize, isSubPage, log2DeltaLookup]
+        // 创建short二维数组，group 21左移2位 21 * 4 = 84  但是为什么是19*4=76
         sizeClasses = new short[group << LOG2_SIZE_CLASS_GROUP][7];
         nSizes = sizeClasses();
 
@@ -141,18 +156,24 @@ abstract class SizeClasses implements SizeClassesMetric {
     // spacing is 1 << LOG2_QUANTUM, so the size of array is lookupMaxclass >> LOG2_QUANTUM
     private final int[] size2idxTab;
 
+    /**
+     * 1<<(LOG2_QUANTUM)为一组，这一组的log2Group和log2Delta是相同，并增长这个nDelta来使得每组数据的两个size的差值相同。
+     */
     private int sizeClasses() {
         int normalMaxSize = -1;
 
         int index = 0;
         int size = 0;
 
+        // 初始值4
         int log2Group = LOG2_QUANTUM;
+        // 初始值4
         int log2Delta = LOG2_QUANTUM;
+        // 初始值 1<<2 = 4
         int ndeltaLimit = 1 << LOG2_SIZE_CLASS_GROUP;
 
         //First small group, nDelta start at 0.
-        //first size class is 1 << LOG2_QUANTUM
+        //first size class is 1 << LOG2_QUANTUM 1<<4=16
         int nDelta = 0;
         while (nDelta < ndeltaLimit) {
             size = sizeClass(index++, log2Group, log2Delta, nDelta++);
