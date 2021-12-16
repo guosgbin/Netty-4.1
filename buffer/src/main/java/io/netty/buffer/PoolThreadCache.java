@@ -55,6 +55,7 @@ final class PoolThreadCache {
     private final MemoryRegionCache<byte[]>[] normalHeapCaches;
     private final MemoryRegionCache<ByteBuffer>[] normalDirectCaches;
 
+    // 清理线程本地缓存需要调用 get 方法的次数 默认8192
     private final int freeSweepAllocationThreshold;
     private final AtomicBoolean freed = new AtomicBoolean();
 
@@ -63,6 +64,15 @@ final class PoolThreadCache {
     // TODO: Test if adding padding helps under contention
     //private long pad0, pad1, pad2, pad3, pad4, pad5, pad6, pad7;
 
+    /**
+     *
+     * @param heapArena
+     * @param directArena
+     * @param smallCacheSize small规格的缓存队列的长度 默认256
+     * @param normalCacheSize normal规格的缓存队列的长度 默认64
+     * @param maxCachedBufferCapacity MemoryRegionCache的最大缓存规格 32k
+     * @param freeSweepAllocationThreshold 清理线程本地缓存需要调用 get 方法的次数 默认8192
+     */
     PoolThreadCache(PoolArena<byte[]> heapArena, PoolArena<ByteBuffer> directArena,
                     int smallCacheSize, int normalCacheSize, int maxCachedBufferCapacity,
                     int freeSweepAllocationThreshold) {
@@ -71,12 +81,13 @@ final class PoolThreadCache {
         this.heapArena = heapArena;
         this.directArena = directArena;
         if (directArena != null) {
-            smallSubPageDirectCaches = createSubPageCaches(
-                    smallCacheSize, directArena.numSmallSubpagePools);
-
-            normalDirectCaches = createNormalCaches(
-                    normalCacheSize, maxCachedBufferCapacity, directArena);
-
+            // 创建长度为directArena.numSmallSubpagePools(默认39)的MemoryRegionCache数组，类型为SubPageMemoryRegionCache
+            // SubPageMemoryRegionCache,内有固定长度256的队列
+            smallSubPageDirectCaches = createSubPageCaches(smallCacheSize, directArena.numSmallSubpagePools);
+            // 创建长度为(默认1)的MemoryRegionCache数组，类型为NormalMemoryRegionCache
+            // NormalMemoryRegionCache,内有固定长度64的队列
+            normalDirectCaches = createNormalCaches(normalCacheSize, maxCachedBufferCapacity, directArena);
+            // Arena使用线程个数自增
             directArena.numThreadCaches.getAndIncrement();
         } else {
             // No directArea is configured so just null out all caches
@@ -85,12 +96,8 @@ final class PoolThreadCache {
         }
         if (heapArena != null) {
             // Create the caches for the heap allocations
-            smallSubPageHeapCaches = createSubPageCaches(
-                    smallCacheSize, heapArena.numSmallSubpagePools);
-
-            normalHeapCaches = createNormalCaches(
-                    normalCacheSize, maxCachedBufferCapacity, heapArena);
-
+            smallSubPageHeapCaches = createSubPageCaches(smallCacheSize, heapArena.numSmallSubpagePools);
+            normalHeapCaches = createNormalCaches(normalCacheSize, maxCachedBufferCapacity, heapArena);
             heapArena.numThreadCaches.getAndIncrement();
         } else {
             // No heapArea is configured so just null out all caches
@@ -107,8 +114,15 @@ final class PoolThreadCache {
         }
     }
 
-    private static <T> MemoryRegionCache<T>[] createSubPageCaches(
-            int cacheSize, int numCaches) {
+    /**
+     * 创建小规格small的缓存数组
+     *
+     * @param cacheSize SubPageMemoryRegionCache内缓存队列的长度 默认256
+     * @param numCaches MemoryRegionCache的数组长度 默认39
+     * @param <T>
+     * @return
+     */
+    private static <T> MemoryRegionCache<T>[] createSubPageCaches(int cacheSize, int numCaches) {
         if (cacheSize > 0 && numCaches > 0) {
             @SuppressWarnings("unchecked")
             MemoryRegionCache<T>[] cache = new MemoryRegionCache[numCaches];
@@ -122,14 +136,27 @@ final class PoolThreadCache {
         }
     }
 
+    /**
+     * 创建大规格normal的缓存数组
+     *
+     * @param cacheSize NormalMemoryRegionCache内缓存队列的长度 默认64
+     * @param maxCachedBufferCapacity 默认32k
+     * @param area
+     * @param <T>
+     * @return
+     */
     @SuppressWarnings("unchecked")
     private static <T> MemoryRegionCache<T>[] createNormalCaches(
             int cacheSize, int maxCachedBufferCapacity, PoolArena<T> area) {
         if (cacheSize > 0 && maxCachedBufferCapacity > 0) {
+            // 找出chunkSize (默认16mb) 和 maxCachedBufferCapacity (默认32k)的最小值
             int max = Math.min(area.chunkSize, maxCachedBufferCapacity);
             // Create as many normal caches as we support based on how many sizeIdx we have and what the upper
             // bound is that we want to cache in general.
             List<MemoryRegionCache<T>> cache = new ArrayList<MemoryRegionCache<T>>() ;
+            // area.numSmallSubpagePools 默认39
+            // area.nSizes 默认76
+            // max 此处是 maxCachedBufferCapacity 也就是32k  area.sizeIdx2size(idx) <= max时最大 idx是39  也就是默认是cache的大小是1
             for (int idx = area.numSmallSubpagePools; idx < area.nSizes && area.sizeIdx2size(idx) <= max ; idx++) {
                 cache.add(new NormalMemoryRegionCache<T>(cacheSize));
             }

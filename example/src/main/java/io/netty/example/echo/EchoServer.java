@@ -77,6 +77,7 @@ public final class EchoServer {
             ChannelFuture f = b.bind(PORT).sync();
             logger.warn("======服务端启动完成======");
 
+            f.channel().writeAndFlush("666");
             // Wait until the server socket is closed.
             f.channel().closeFuture().sync();
         } finally {

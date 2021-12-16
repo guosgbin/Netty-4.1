@@ -37,9 +37,12 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         Normal
     }
 
+    // 当前Arena所属的PooledByteBufAllocator对象
     final PooledByteBufAllocator parent;
 
+    // small规格数组的长度 默认39
     final int numSmallSubpagePools;
+    // 内存对齐 默认是0
     final int directMemoryCacheAlignment;
     private final PoolSubpage<T>[] smallSubpagePools;
 
@@ -71,6 +74,14 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
     // TODO: Test if adding padding helps under contention
     //private long pad0, pad1, pad2, pad3, pad4, pad5, pad6, pad7;
 
+    /**
+     *
+     * @param parent 当前Arena所属的PooledByteBufAllocator对象
+     * @param pageSize 页内存大小 默认8k
+     * @param pageShifts 1左移多少位得到 pageSize 默认13
+     * @param chunkSize 一个chunk能够管理的内存大小 默认16mb
+     * @param cacheAlignment 内存对齐
+     */
     protected PoolArena(PooledByteBufAllocator parent, int pageSize,
           int pageShifts, int chunkSize, int cacheAlignment) {
         super(pageSize, pageShifts, chunkSize, cacheAlignment);
@@ -78,6 +89,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         this.parent = parent;
         directMemoryCacheAlignment = cacheAlignment;
 
+        // small规格数组的长度 默认39
         numSmallSubpagePools = nSubpages;
         // 创建 PoolSubpage 数组
         smallSubpagePools = newSubpagePoolArray(numSmallSubpagePools);
@@ -124,13 +136,30 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
 
     abstract boolean isDirect();
 
+    /**
+     * 分配内存池化内存
+     *
+     * @param cache 线程本地缓存对象 PoolThreadCache
+     * @param reqCapacity 业务需要的内存大小
+     * @param maxCapacity 最大的内存大小
+     * @return
+     */
     PooledByteBuf<T> allocate(PoolThreadCache cache, int reqCapacity, int maxCapacity) {
+        // 根据maxCapacity初始化一个池化的内存对象，注意此时里面并没有包含指向真正内存位置的信息
         PooledByteBuf<T> buf = newByteBuf(maxCapacity);
         allocate(cache, buf, reqCapacity);
         return buf;
     }
 
+    /**
+     * 分配内存池化内存
+     *
+     * @param cache 线程本地缓存对象 PoolThreadCache
+     * @param buf 初始化的池化的内存对象
+     * @param reqCapacity 业务需要的内存大小
+     */
     private void allocate(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity) {
+        // 获得
         final int sizeIdx = size2SizeIdx(reqCapacity);
 
         if (sizeIdx <= smallMaxSizeIdx) {
