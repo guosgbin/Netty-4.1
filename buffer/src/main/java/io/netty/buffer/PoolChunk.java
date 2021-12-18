@@ -25,15 +25,20 @@ import java.util.PriorityQueue;
  *
  * Notation: The following terms are important to understand the code
  * > page  - a page is the smallest unit of memory chunk that can be allocated
+ *           page页是可以分配的最小内存块单位
  * > run   - a run is a collection of pages
+ *           run是pages的集合
  * > chunk - a chunk is a collection of runs
+ *           chunk块是runs的集合
  * > in this code chunkSize = maxPages * pageSize
- *
+*              poolChunk管理的内存大小 = 最大页数 * 页内存大小
  * To begin we allocate a byte array of size = chunkSize
  * Whenever a ByteBuf of given size needs to be created we search for the first position
  * in the byte array that has enough empty space to accommodate the requested size and
  * return a (long) handle that encodes this offset information, (this memory segment is then
  * marked as reserved so it is always used by exactly one ByteBuf and no more)
+ *
+ * 从数组的第一个位置开始找，直到找到一个能个容纳 业务需要的大小 的位置
  *
  * For simplicity all sizes are normalized according to {@link PoolArena#size2SizeIdx(int)} method.
  * This ensures that when we request for memory segments of size > pageSize the normalizedCapacity
@@ -73,30 +78,32 @@ import java.util.PriorityQueue;
  *
  * oooooooo ooooooos ssssssss ssssssue bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb
  *
- * o: runOffset (page offset in the chunk), 15bit
- * s: size (number of pages) of this run, 15bit
- * u: isUsed?, 1bit
- * e: isSubpage?, 1bit
- * b: bitmapIdx of subpage, zero if it's not subpage, 32bit
+ * o: runOffset (page offset in the chunk), 15bit    chunk的页面偏移量
+ * s: size (number of pages) of this run, 15bit      run中页数
+ * u: isUsed?, 1bit                                  是否已经被使用了
+ * e: isSubpage?, 1bit                               是否是小规格内存
+ * b: bitmapIdx of subpage, zero if it's not subpage, 32bit   小规格内存的位图信息
  *
- * runsAvailMap:
+ * runsAvailMap: 管理所有的run，
  * ------
  * a map which manages all runs (used and not in used).
  * For each run, the first runOffset and last runOffset are stored in runsAvailMap.
  * key: runOffset
  * value: handle
  *
- * runsAvail:
+ * runsAvail:优先队列
  * ----------
  * an array of {@link PriorityQueue}.
  * Each queue manages same size of runs.
  * Runs are sorted by offset, so that we always allocate runs with smaller offset.
+ * 按照最小偏移量来分配
  *
  *
  * Algorithm:
  * ----------
  *
  *   As we allocate runs, we update values stored in runsAvailMap and runsAvail so that the property is maintained.
+ *   当我们分配run时，我们更新存储在 runningAvailMap 和 runningAvail 中的值，以便维护该属性
  *
  * Initialization -
  *  In the beginning we store the initial run which is the whole chunk.
@@ -137,12 +144,15 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     static final int IS_SUBPAGE_SHIFT = BITMAP_IDX_BIT_LENGTH;
     static final int IS_USED_SHIFT = SUBPAGE_BIT_LENGTH + IS_SUBPAGE_SHIFT;
-    static final int SIZE_SHIFT = INUSED_BIT_LENGTH + IS_USED_SHIFT;
+    static final int SIZE_SHIFT = INUSED_BIT_LENGTH + IS_USED_SHIFT; // 34
     static final int RUN_OFFSET_SHIFT = SIZE_BIT_LENGTH + SIZE_SHIFT;
 
+    // 当前PoolChunk所属的Arena
     final PoolArena<T> arena;
     final Object base;
+    // 给PoolChunk真正分配的内存
     final T memory;
+    // 是否池化内存 true不是 false是
     final boolean unpooled;
 
     /**
@@ -157,11 +167,15 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     /**
      * manage all subpages in this chunk
+     * 默认2048个8k的page页面
      */
     private final PoolSubpage<T>[] subpages;
 
+    // 页内存大小 默认8k
     private final int pageSize;
+    // 1左移pageShifts位得到pageSize  默认13
     private final int pageShifts;
+    // PoolChunk管理的内存大小 默认16mb
     private final int chunkSize;
 
     // Use as cache for ByteBuffer created from the memory. These are just duplicates and so are only a container
@@ -171,6 +185,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
     // This may be null if the PoolChunk is unpooled as pooling the ByteBuffer instances does not make any sense here.
     private final Deque<ByteBuffer> cachedNioBuffers;
 
+    // 剩余可用大小
     int freeBytes;
 
     PoolChunkList<T> parent;
@@ -180,6 +195,17 @@ final class PoolChunk<T> implements PoolChunkMetric {
     // TODO: Test if adding padding helps under contention
     //private long pad0, pad1, pad2, pad3, pad4, pad5, pad6, pad7;
 
+    /**
+     * 创建一个PoolChunk实例
+     *
+     * @param arena PoolChunk所属的Arena
+     * @param base 能够分配的内存 默认16mb
+     * @param memory 能够分配的内存 默认16mb
+     * @param pageSize 页内存大小 默认8k
+     * @param pageShifts 默认13
+     * @param chunkSize 默认16mb
+     * @param maxPageIdx 最大页面 索引  默认40
+     */
     @SuppressWarnings("unchecked")
     PoolChunk(PoolArena<T> arena, Object base, T memory, int pageSize, int pageShifts, int chunkSize, int maxPageIdx) {
         unpooled = false;
@@ -193,11 +219,14 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
         runsAvail = newRunsAvailqueueArray(maxPageIdx);
         runsAvailMap = new LongLongHashMap(-1);
+        // chunkSize >> pageShifts 默认2048
         subpages = new PoolSubpage[chunkSize >> pageShifts];
 
         //insert initial run, offset = 0, pages = chunkSize / pageSize
         int pages = chunkSize >> pageShifts;
+        // 0010 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
         long initHandle = (long) pages << SIZE_SHIFT;
+        // insertAvailRun方法在runsAvail数组最后位置插入一个handle，该handle代表page偏移位置为0的地方可以分配16M的内存块
         insertAvailRun(0, pages, initHandle);
 
         cachedNioBuffers = new ArrayDeque<ByteBuffer>(8);
@@ -218,6 +247,12 @@ final class PoolChunk<T> implements PoolChunkMetric {
         cachedNioBuffers = null;
     }
 
+    /**
+     * 创建一个指定大小的 LongPriorityQueue 数组
+     *Git
+     * @param size maxPageIdx属性 默认40
+     * @return
+     */
     private static LongPriorityQueue[] newRunsAvailqueueArray(int size) {
         LongPriorityQueue[] queueArray = new LongPriorityQueue[size];
         for (int i = 0; i < queueArray.length; i++) {
@@ -226,7 +261,15 @@ final class PoolChunk<T> implements PoolChunkMetric {
         return queueArray;
     }
 
+    /**
+     * 添加到runsAvail中
+     *
+     * @param runOffset 偏移量
+     * @param pages 页数
+     * @param handle handle句柄
+     */
     private void insertAvailRun(int runOffset, int pages, long handle) {
+        // 根据页数获得page的索引pageIdx -1 ，eg. pages=2048,则pageIdx=40，故pageIdxFloor-1=39
         int pageIdxFloor = arena.pages2pageIdxFloor(pages);
         LongPriorityQueue queue = runsAvail[pageIdxFloor];
         queue.offer(handle);

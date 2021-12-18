@@ -18,6 +18,7 @@ package io.netty.buffer;
 /**
  * Internal primitive map implementation that is specifically optimised for the runs availability map use case in {@link
  * PoolChunk}.
+ * 内部原始映射实现，专门针对PoolChunk的运行可用性映射用例进行了PoolChunk 。
  */
 final class LongLongHashMap {
     private static final int MASK_TEMPLATE = ~1;

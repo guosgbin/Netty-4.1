@@ -166,7 +166,7 @@ final class PoolThreadCache {
         }
     }
 
-    // val > 0
+    // val > 0 计算后面的位数
     static int log2(int val) {
         // 31 - 7(chunkSize二进制前面0的个数) = 24
         // chunkSize默认16MiB 1后面24个0

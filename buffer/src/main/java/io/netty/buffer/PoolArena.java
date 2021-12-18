@@ -155,18 +155,19 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
      * 分配内存池化内存
      *
      * @param cache 线程本地缓存对象 PoolThreadCache
-     * @param buf 初始化的池化的内存对象
+     * @param buf 初始化的池化的内存对象 需要往里设置真正的内存位置信息
      * @param reqCapacity 业务需要的内存大小
      */
     private void allocate(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity) {
-        // 获得
+        // 根据业务需要的内存大小，返回一个netty能个分配的合适规格大小 在sizeIdx2sizeTab数组上的索引
         final int sizeIdx = size2SizeIdx(reqCapacity);
 
-        if (sizeIdx <= smallMaxSizeIdx) {
+        // smallMaxSizeIdx默认38，38位置表示的内存大小是28k
+        if (sizeIdx <= smallMaxSizeIdx) { // 小于等于28k就是small规格的内存
             tcacheAllocateSmall(cache, buf, reqCapacity, sizeIdx);
-        } else if (sizeIdx < nSizes) {
+        } else if (sizeIdx < nSizes) { // normal规格的内存
             tcacheAllocateNormal(cache, buf, reqCapacity, sizeIdx);
-        } else {
+        } else { // 大于默认的16mb的内存，直接分配大内存了
             int normCapacity = directMemoryCacheAlignment > 0
                     ? normalizeSize(reqCapacity) : reqCapacity;
             // Huge allocations are never served via the cache so just call allocateHuge
@@ -174,22 +175,35 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         }
     }
 
+    /**
+     * 分配small规格的内存
+     *
+     * @param cache 线程本地缓存对象
+     * @param buf 初始化的池化的内存对象 需要往里设置真正的内存位置信息
+     * @param reqCapacity 业务需要的内存大小
+     * @param sizeIdx 合适规格大小在sizeIdx2sizeTab数组上的索引
+     */
     private void tcacheAllocateSmall(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity,
                                      final int sizeIdx) {
 
+        // 尝试从缓存中分配一个缓存
         if (cache.allocateSmall(this, buf, reqCapacity, sizeIdx)) {
             // was able to allocate out of the cache so move on
             return;
         }
 
         /*
+         * 对head节点加锁
          * Synchronize on the head. This is needed as {@link PoolChunk#allocateSubpage(int)} and
          * {@link PoolChunk#free(long)} may modify the doubly linked list as well.
          */
+        // 获取Arena中的smallSubpagePools的指定位置的head节点
         final PoolSubpage<T> head = smallSubpagePools[sizeIdx];
+        // 表示smallSubpagePools的sizeIdx位置是否需要新建 TODO-G
         final boolean needsNormalAllocation;
         synchronized (head) {
             final PoolSubpage<T> s = head.next;
+            // s == head 表示head是指向自己的，也就是smallSubpagePools的该位置之前没有添加过数据
             needsNormalAllocation = s == head;
             if (!needsNormalAllocation) {
                 assert s.doNotDestroy && s.elemSize == sizeIdx2size(sizeIdx);
@@ -199,6 +213,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
             }
         }
 
+        // needsNormalAllocation 为true表示头节点head下没有节点
         if (needsNormalAllocation) {
             synchronized (this) {
                 allocateNormal(buf, reqCapacity, sizeIdx, cache);
@@ -208,8 +223,17 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         incSmallAllocation();
     }
 
+    /**
+     * 分配small规格的内存
+     *
+     * @param cache 线程本地缓存对象
+     * @param buf 初始化的池化的内存对象 需要往里设置真正的内存位置信息
+     * @param reqCapacity 业务需要的内存大小
+     * @param sizeIdx 合适规格大小在sizeIdx2sizeTab数组上的索引
+     */
     private void tcacheAllocateNormal(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity,
                                       final int sizeIdx) {
+        // 尝试去缓存分配
         if (cache.allocateNormal(this, buf, reqCapacity, sizeIdx)) {
             // was able to allocate out of the cache so move on
             return;
@@ -220,8 +244,17 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         }
     }
 
+    /**
+     * 分配normal规格大小的内存
+     *
+     * @param buf 初始化的池化的内存对象 需要往里设置真正的内存位置信息
+     * @param reqCapacity 业务需要的内存大小
+     * @param sizeIdx 合适规格大小在sizeIdx2sizeTab数组上的索引
+     * @param threadCache 线程本地缓存对象
+     */
     // Method must be called inside synchronized(this) { ... } block
     private void allocateNormal(PooledByteBuf<T> buf, int reqCapacity, int sizeIdx, PoolThreadCache threadCache) {
+        // 这些是依次从 q050, q025,q000,qInit,q075上去分配，假如都分配不了，说明需要创建一个新的PoolChunk对象
         if (q050.allocate(buf, reqCapacity, sizeIdx, threadCache) ||
             q025.allocate(buf, reqCapacity, sizeIdx, threadCache) ||
             q000.allocate(buf, reqCapacity, sizeIdx, threadCache) ||
@@ -230,6 +263,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
             return;
         }
 
+        // 上面的chunklist中的chunk都无法分配该内存的话，就去新建一个chunk
         // Add a new chunk.
         PoolChunk<T> c = newChunk(pageSize, nPSizes, pageShifts, chunkSize);
         boolean success = c.allocate(buf, reqCapacity, sizeIdx, threadCache);
@@ -632,10 +666,20 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
             return true;
         }
 
+        /**
+         * 创建一个新的PoolChunk
+         *
+         * @param pageSize 一页内存大小 默认8k
+         * @param maxPageIdx 最大页面 索引 默认40
+         * @param pageShifts 1左移 pageShifts 位得到pageSize  默认13位
+         * @param chunkSize 一个chunk能够管理的最大内存大小 默认16mb
+         * @return
+         */
         @Override
         protected PoolChunk<ByteBuffer> newChunk(int pageSize, int maxPageIdx,
             int pageShifts, int chunkSize) {
-            if (directMemoryCacheAlignment == 0) {
+            if (directMemoryCacheAlignment == 0) { // 内存对齐 默认是0
+                // 为PoolChunk分配16mb的内存
                 ByteBuffer memory = allocateDirect(chunkSize);
                 return new PoolChunk<ByteBuffer>(this, memory, memory, pageSize, pageShifts,
                         chunkSize, maxPageIdx);

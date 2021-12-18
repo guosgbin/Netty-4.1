@@ -25,16 +25,14 @@ import static io.netty.buffer.PoolThreadCache.*;
  *   LOG2_MAX_LOOKUP_SIZE: Log of max size class in the lookup table.
  *   sizeClasses: Complete table of [index, log2Group, log2Delta, nDelta, isMultiPageSize,
  *                 isSubPage, log2DeltaLookup] tuples.
- *     index: Size class index.表示每个size类型的索引
- *     log2Group: Log of group base size (no deltas added).表示的对应size的对应的组，用于计算对应的size
- *     log2Delta: Log of delta to previous size class. 表示的是和上一个sizeClass的差值的log2值，其实就是Dsize的log2值
- *     nDelta: Delta multiplier.表示的是这一组中的delta乘值
+ *     index: Size class index.
+ *     log2Group: Log of group base size (no deltas added).
+ *     log2Delta: Log of delta to previous size class.
+ *     nDelta: Delta multiplier.
  *     isMultiPageSize: 'yes' if a multiple of the page size, 'no' otherwise.
- *                      表示的是这个size是否是page的倍数(这个表格的一个page的大小是1kB,故是1kB的倍数的size即为1)
  *     isSubPage: 'yes' if a subpage size class, 'no' otherwise.
- *              表示其是否为一个subPage类型(即这种类型的size需要利用subPage进行分配)
  *     log2DeltaLookup: Same as log2Delta if a lookup table size class, 'no'
- *                      otherwise.表示的是lookup的size的值即为log2Delata值，其它时间则为0（代码中没看到具体用处）
+ *                      otherwise.
  * <p>
  *   nSubpages: Number of subpages size classes.
  *   nSizes: Number of size classes.
@@ -170,6 +168,7 @@ import static io.netty.buffer.PoolThreadCache.*;
  * Netty内存池中每个内存块size都符合如下计算公式
  *
  * size = 1 << log2Group + nDelta * (1 << log2Delta)
+ * 简单看就是 size = 2^log2Group + nDelta * 2^log2Delta
  *
  * log2Group：内存块分组
  * nDelta：增量乘数
@@ -177,13 +176,20 @@ import static io.netty.buffer.PoolThreadCache.*;
  *
  * SizeClasses初始化后，将计算chunkSize（内存池每次向操作系统申请内存块大小）范围内每个size的值，保存到sizeClasses字段中。
  * sizeClasses是一个表格（二维数组），共有7列，含义如下
- * index:内存块size的索引
- * log2Group:内存块分组，用于计算对应的size
- * log2Delata:增量大小的log2值，用于计算对应的size
- * nDelta:增量乘数，用于计算对应的size
- * isMultipageSize:表示size是否为page的倍数
- * isSubPage:表示是否为一个subPage类型
- * log2DeltaLookup:如果size存在位图中的，记录其log2Delta，未使用
+ *      index:内存块size的索引
+ *      log2Group:内存块分组，用于计算对应的size
+ *      log2Delata:增量大小的log2值，用于计算对应的size
+ *      nDelta:增量乘数，用于计算对应的size
+ *      isMultipageSize:表示size是否为page的倍数
+ *      isSubPage:表示是否为一个subPage类型
+ *      log2DeltaLookup:如果size存在位图中的，记录其log2Delta，未使用
+ *
+ * sizeClasses表格可以分为两部分，isSubPage为1的size为Small内存块，其他为Normal内存块。
+ * 分配Small内存块，需要找到对应的index，通过size2SizeIdx方法计算index
+ * 比如需要分配一个90字节的内存块，需要从sizeClasses表格找到第一个大于90的内存块size，即96，其index为5。
+ *
+ * Normal内存块必须是page的倍数。将isMultipageSize为1的行取出组成另一个表格
+ *
  */
 abstract class SizeClasses implements SizeClassesMetric {
 
@@ -193,6 +199,7 @@ abstract class SizeClasses implements SizeClassesMetric {
     private static final int LOG2_MAX_LOOKUP_SIZE = 12;
 
     // index, log2Group, log2Delta, nDelta, isMultiPageSize, isSubPage, log2DeltaLookup
+    // 二维数组每列的含义
     private static final int INDEX_IDX = 0;
     private static final int LOG2GROUP_IDX = 1;
     private static final int LOG2DELTA_IDX = 2;
@@ -255,7 +262,7 @@ abstract class SizeClasses implements SizeClassesMetric {
     // 判断分配是从subpage分配还是直接从poolchunk中进行分配  38
     int smallMaxSizeIdx;
 
-    // 4096
+    // 默认4096
     private int lookupMaxSize;
 
     // 为上面的存储了log2Group等7个数据的表格
@@ -489,10 +496,10 @@ abstract class SizeClasses implements SizeClassesMetric {
     }
 
     /**
-     * 根据业务需要的内存大小 转换为netty能够分配的最接近的一个规格的内存大小的索引
+     * 根据业务需要的内存大小 转换为netty能够分配的最接近的一个规格的内存大小sizeClasses上的索引
      *
      * @param size request size 业务需要的内存的大小
-     * @return 返回netty的合适规格大小的索引
+     * @return 返回netty的合适规格大小在sizeClasses上的索引
      */
     @Override
     public int size2SizeIdx(int size) {
@@ -516,20 +523,51 @@ abstract class SizeClasses implements SizeClassesMetric {
             // eg. size = 2345 则 size - 1 = 2344 ，故 2344 >> 4 = 146，所以 size2idxTab[146] = 24 在sizeClasses的0位置处的大小是2.5K
             return size2idxTab[size - 1 >> LOG2_QUANTUM];
         }
+        // 走到此处 前置条件 size > lookupMaxSize
 
+        // 对申请内存大小进行log2的向上取整，就是每组最后一个内存块size。-1是为了避免申请内存大小刚好等于2的指数次幂时被翻倍。
+        // 将log2Group = log2Delta + LOG2_SIZE_CLASS_GROUP，nDelta=2^LOG2_SIZE_CLASS_GROUP代入计算公式，可得
+        //         lastSize = 1 << (log2Group + 1)
+        // 即x = log2Group + 1
+        // eg. size = 5000 此时 x = log2(9999) = 13
         int x = log2((size << 1) - 1);
-        int shift = x < LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM + 1
-                ? 0 : x - (LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM);
+        // LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM + 1 是7
+        // 13 < 2 + 4 + 1 ? 0 : 13 - (2 + 4) = 7
 
+        // ===== shift表示当前size在第几组，group表示该组第一个元素在sizeClasses上的索引=====
+
+        // shift表示当前在第几组，每四个一组，也就是sizeClasses表格中index 0-3位第0组，4-7为第1组...
+        // 条件x < LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM + 1，也就是log2Group < LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM
+        // 满足这个条件的只有第0组的size，此时shift是0
+        // 从sizeClasses方法可以看到，除了第0组，都满足shift = log2Group - LOG2_QUANTUM - (LOG2_SIZE_CLASS_GROUP - 1)
+        // 也就是 shift = log2Group - 5
+        int shift = x < LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM + 1 ? 0 : x - (LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM);
+        // shift << LOG2_SIZE_CLASS_GROUP就是该组第一个内存块size的索引
+        // 左移2位  7* 4 = 28
         int group = shift << LOG2_SIZE_CLASS_GROUP;
 
-        int log2Delta = x < LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM + 1
-                ? LOG2_QUANTUM : x - LOG2_SIZE_CLASS_GROUP - 1;
+        // ===== 计算log2Delta
+        // 第0组固定是LOG2_QUANTUM
+        // 除了第0组，将nDelta = 2^LOG2_SIZE_CLASS_GROUP代入计算公式
+        // lastSize = ( 2^LOG2_SIZE_CLASS_GROUP + 2^LOG2_SIZE_CLASS_GROUP ) * (1 << log2Delta)
+        // lastSize = (1 << log2Delta) << LOG2_SIZE_CLASS_GROUP << 1
 
+        // 13 < 2 + 4 + 1 ? 4 : 13 - 2 - 1 = 10
+        int log2Delta = x < LOG2_SIZE_CLASS_GROUP + LOG2_QUANTUM + 1 ? LOG2_QUANTUM : x - LOG2_SIZE_CLASS_GROUP - 1;
+
+        // 前面已经定位到第几组了，下面要找到申请内存大小应分配在该组第几位
+        // -1024
         int deltaInverseMask = -1 << log2Delta;
-        int mod = (size - 1 & deltaInverseMask) >> log2Delta &
-                  (1 << LOG2_SIZE_CLASS_GROUP) - 1;
-
+        // 4999 & -1024
+        // 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0001 0011 1000 0111
+        // 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1100 0000 0000
+        // 4096 >> 10
+        // (4999 & -1024) >> 10 & (1<<2)-1 = 0
+        // & deltaInverseMask，将申请内存大小最后log2Delta个bit位设置为0
+        // >> log2Delta，右移log2Delta个bit位，就是除以(1 << log2Delta)，结果就是(nDelta - 1 + 2 ^ LOG2_SIZE_CLASS_GROUP)
+        // & (1 << LOG2_SIZE_CLASS_GROUP) - 1， 取模运算
+        // size - 1，是为了申请内存等于内存块size时避免分配到下一个内存块size中，即n == (1 << log2Delta)的场景
+        int mod = (size - 1 & deltaInverseMask) >> log2Delta & (1 << LOG2_SIZE_CLASS_GROUP) - 1;
         return group + mod;
     }
 
@@ -543,25 +581,43 @@ abstract class SizeClasses implements SizeClassesMetric {
         return pages2pageIdxCompute(pages, true);
     }
 
+    /**
+     * 根据给定的页数来计算出其对应的页的序号，其获取的则是下面表格中最后一列的数值，即为isMultiPageSize是1时从0开始的对size的编号
+     * size = 1 << log2Group + nDelta * (1 << log2Delta)
+     * log2Group = log2Delta + LOG2_SIZE_CLASS_GROUP
+     *
+     * 要使 size = k(1 << pageShifts)
+     *
+     * k = (nDelta + 2^LOG2_SIZE_CLASS_GROUP) * 2^(log2Delta - pageShifts)
+     *
+     * @param pages 页面大小的倍数
+     * @param floor
+     * @return 返回页面大小倍数的索引
+     */
     private int pages2pageIdxCompute(int pages, boolean floor) {
+        // 默认13位 也就是乘以8k
         int pageSize = pages << pageShifts;
         if (pageSize > chunkSize) {
             return nPSizes;
         }
 
+        // 对pageSize进行log2的向上取整 23
+        // x = log2Group+1
         int x = log2((pageSize << 1) - 1);
 
-        int shift = x < LOG2_SIZE_CLASS_GROUP + pageShifts
-                ? 0 : x - (LOG2_SIZE_CLASS_GROUP + pageShifts);
+        // shift表示第几组，group表示该组在sizeClasses上index索引位置
 
+        // x >= LOG2_SIZE_CLASS_GROUP + pageShifts + 1 后则每个size都是 1 << pageShifts的倍数
+        // 小于15视为0 大于等于15其
+        // 23 < 15 ? 0 : 23-15=8
+        int shift = x < LOG2_SIZE_CLASS_GROUP + pageShifts ? 0 : x - (LOG2_SIZE_CLASS_GROUP + pageShifts);
+        // 8<<2 = 32
         int group = shift << LOG2_SIZE_CLASS_GROUP;
-
-        int log2Delta = x < LOG2_SIZE_CLASS_GROUP + pageShifts + 1?
-                pageShifts : x - LOG2_SIZE_CLASS_GROUP - 1;
+        // 23 < 15+1?13:23-2-1=20
+        int log2Delta = x < LOG2_SIZE_CLASS_GROUP + pageShifts + 1? pageShifts : x - LOG2_SIZE_CLASS_GROUP - 1;
 
         int deltaInverseMask = -1 << log2Delta;
-        int mod = (pageSize - 1 & deltaInverseMask) >> log2Delta &
-                  (1 << LOG2_SIZE_CLASS_GROUP) - 1;
+        int mod = (pageSize - 1 & deltaInverseMask) >> log2Delta & (1 << LOG2_SIZE_CLASS_GROUP) - 1;
 
         int pageIdx = group + mod;
 
