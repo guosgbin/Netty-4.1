@@ -68,10 +68,15 @@ public abstract class AbstractByteBuf extends ByteBuf {
     static final ResourceLeakDetector<ByteBuf> leakDetector =
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(ByteBuf.class);
 
+    // 读指针
     int readerIndex;
+    // 写指针
     int writerIndex;
+    // 标记读指针
     private int markedReaderIndex;
+    // 标记写指针
     private int markedWriterIndex;
+    // 最大容量
     private int maxCapacity;
 
     protected AbstractByteBuf(int maxCapacity) {
@@ -214,19 +219,25 @@ public abstract class AbstractByteBuf extends ByteBuf {
 
     @Override
     public ByteBuf discardReadBytes() {
+        // 读指针为0，说明还未读取数据，校验一下 直接返回this
         if (readerIndex == 0) {
             ensureAccessible();
             return this;
         }
 
-        if (readerIndex != writerIndex) {
+        if (readerIndex != writerIndex) { // 读指针和写指针位置不相等
+            // 将writerIndex 和 readerIndex 之间还未读取的数据移动到 0索引处
             setBytes(0, this, readerIndex, writerIndex - readerIndex);
+            // 设置写指针
             writerIndex -= readerIndex;
             adjustMarkers(readerIndex);
+            // 设置读指针
             readerIndex = 0;
-        } else {
+        } else { // 读指针和写指针相等
             ensureAccessible();
+            // 调整读指针的标记
             adjustMarkers(readerIndex);
+            // 读指针和写指针全部设置为0
             writerIndex = readerIndex = 0;
         }
         return this;
@@ -235,6 +246,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
     @Override
     public ByteBuf discardSomeReadBytes() {
         if (readerIndex > 0) {
+            // 读指针和写指针相等的话，就调整mark标记，读写指针置为0
             if (readerIndex == writerIndex) {
                 ensureAccessible();
                 adjustMarkers(readerIndex);
@@ -242,6 +254,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
                 return this;
             }
 
+            // 假如读指针大于等于 容量的一半，才会去移动操作
             if (readerIndex >= capacity() >>> 1) {
                 setBytes(0, this, readerIndex, writerIndex - readerIndex);
                 writerIndex -= readerIndex;
@@ -254,6 +267,11 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return this;
     }
 
+    /**
+     * 调整 markedReaderIndex 和 markedWriterIndex 的值
+     *
+     * @param decrement
+     */
     protected final void adjustMarkers(int decrement) {
         if (markedReaderIndex <= decrement) {
             markedReaderIndex = 0;
@@ -281,12 +299,20 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return this;
     }
 
+    /**
+     * 校验是否可以写
+     *
+     * @param minWritableBytes 待写入的字节数
+     */
     final void ensureWritable0(int minWritableBytes) {
+        // 获得写指针
         final int writerIndex = writerIndex();
+        // 目标容量
         final int targetCapacity = writerIndex + minWritableBytes;
         // using non-short-circuit & to reduce branching - this is a hot path and targetCapacity should rarely overflow
         if (targetCapacity >= 0 & targetCapacity <= capacity()) {
             ensureAccessible();
+            // 表示容量能够容纳指定大小
             return;
         }
         if (checkBounds && (targetCapacity < 0 || targetCapacity > maxCapacity)) {
@@ -297,7 +323,9 @@ public abstract class AbstractByteBuf extends ByteBuf {
         }
 
         // Normalize the target capacity to the power of 2.
+        // 返回不用复制和重新分配内存的最快最大可写字节数  默认是 capacity() - writerIndex
         final int fastWritable = maxFastWritableBytes();
+        // fastWritable >= minWritableBytes 说明剩余的空间还足够，不需要扩容
         int newCapacity = fastWritable >= minWritableBytes ? writerIndex + fastWritable
                 : alloc().calculateNewCapacity(targetCapacity, maxCapacity);
 
@@ -311,6 +339,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
         checkPositiveOrZero(minWritableBytes, "minWritableBytes");
 
         if (minWritableBytes <= writableBytes()) {
+            // buffer剩余空间足够写入指定长度的字节，则返回0
             return 0;
         }
 
@@ -318,9 +347,10 @@ public abstract class AbstractByteBuf extends ByteBuf {
         final int writerIndex = writerIndex();
         if (minWritableBytes > maxCapacity - writerIndex) {
             if (!force || capacity() == maxCapacity) {
+                // force为fasle，或者已经是最大的了maxCapacity，返回1
                 return 1;
             }
-
+            // buffer剩余空间不够写入指定长度的字节，将容量增加到maxCapacity，返回3
             capacity(maxCapacity);
             return 3;
         }
@@ -331,6 +361,7 @@ public abstract class AbstractByteBuf extends ByteBuf {
 
         // Adjust to the new capacity.
         capacity(newCapacity);
+        // 正常扩容，返回2
         return 2;
     }
 
@@ -923,10 +954,22 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return this;
     }
 
+    /**
+     *
+     *
+     * @param dst
+     * @param dstIndex the first index of the destination
+     * @param length   the number of bytes to transfer
+     *
+     * @return
+     */
     @Override
     public ByteBuf readBytes(ByteBuf dst, int dstIndex, int length) {
+        // 校验ByteBuf是否可读，校验可读长度是否小于length
         checkReadableBytes(length);
+        // 具体的数据读取由子类实现
         getBytes(readerIndex, dst, dstIndex, length);
+        // 调整读索引
         readerIndex += length;
         return this;
     }
@@ -1098,10 +1141,22 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return this;
     }
 
+    /**
+     * 写数据到指定缓冲区
+     *
+     * @param src
+     * @param srcIndex the first index of the source
+     * @param length   the number of bytes to transfer
+     *
+     * @return
+     */
     @Override
     public ByteBuf writeBytes(ByteBuf src, int srcIndex, int length) {
+        // 校验是否可写，当容量不足时自动扩容
         ensureWritable(length);
+        // 缓冲区真正的写操作由子类实现
         setBytes(writerIndex, src, srcIndex, length);
+        // 写指针增加
         writerIndex += length;
         return this;
     }

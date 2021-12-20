@@ -129,6 +129,8 @@ public interface ByteBufAllocator {
     /**
      * Calculate the new capacity of a {@link ByteBuf} that is used when a {@link ByteBuf} needs to expand by the
      * {@code minNewCapacity} with {@code maxCapacity} as upper-bound.
+     *
+     * 计算ByteBuf的新容量，当ByteBuf需要以maxCapacity为上限扩展minNewCapacity使用。
      */
     int calculateNewCapacity(int minNewCapacity, int maxCapacity);
  }
