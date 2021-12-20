@@ -137,15 +137,20 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private int cancelledKeys;
     private boolean needsToSelectAgain;
 
-    // 参数一：当前NioEventLoopGroup
-    // 参数二：ThreadPerTaskExecutor
-    // 参数三：selectorProvider，选择器提供器
-    // 参数四：选择器工作策略 DefaultSelectStrategy
-    // 参数五：线程池拒绝策略
+    /**
+     *
+     * @param parent 当前NioEventLoop所属的NioEventLoopGroup
+     * @param executor 线程执行器
+     * @param selectorProvider 选择器提供器
+     * @param strategy 选择策略
+     * @param rejectedExecutionHandler 拒绝策略
+     * @param taskQueueFactory
+     * @param tailTaskQueueFactory
+     */
     NioEventLoop(NioEventLoopGroup parent, Executor executor, SelectorProvider selectorProvider,
                  SelectStrategy strategy, RejectedExecutionHandler rejectedExecutionHandler,
                  EventLoopTaskQueueFactory taskQueueFactory, EventLoopTaskQueueFactory tailTaskQueueFactory) {
-        // 参数一：当前NioEventLoopGroup
+        // 参数一：当前NioEventLoop所属的NioEventLoopGroup
         // 参数二：ThreadPerTaskExecutor, 是在Group中创建的
         // 参数三：
         // 参数四：最终返回的是一个队列，最大程度是Integer.MAX_VALUE，最小是16

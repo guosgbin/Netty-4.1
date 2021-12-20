@@ -79,6 +79,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private volatile Thread thread;
     @SuppressWarnings("unused")
     private volatile ThreadProperties threadProperties;
+    // 这个是包装过的executor
     private final Executor executor;
     private volatile boolean interrupted;
 

@@ -40,6 +40,8 @@ import java.nio.charset.UnsupportedCharsetException;
  * {@link Unpooled} rather than calling an individual implementation's
  * constructor.
  *
+ * 建议使用 {@link Unpooled} 创建缓冲区，而不是调用构造方法
+ *
  * <h3>Random Access Indexing</h3>
  *
  * Just like an ordinary primitive byte array, {@link ByteBuf} uses
@@ -47,6 +49,8 @@ import java.nio.charset.UnsupportedCharsetException;
  * It means the index of the first byte is always {@code 0} and the index of the last byte is
  * always {@link #capacity() capacity - 1}.  For example, to iterate all bytes of a buffer, you
  * can do the following, regardless of its internal implementation:
+ *
+ * 直接for循环遍历
  *
  * <pre>
  * {@link ByteBuf} buffer = ...;
@@ -208,6 +212,7 @@ import java.nio.charset.UnsupportedCharsetException;
  * A derived buffer will have an independent {@link #readerIndex() readerIndex},
  * {@link #writerIndex() writerIndex} and marker indexes, while it shares
  * other internal data representation, just like a NIO buffer does.
+ * 这些派生的缓存区，和真正的缓存区工共享内存，只是有独立的读写指针
  * <p>
  * In case a completely fresh copy of an existing buffer is required, please
  * call {@link #copy()} method instead.
@@ -249,6 +254,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
     /**
      * Returns the number of bytes (octets) this buffer can contain.
+     * 返回缓存区的容量
      */
     public abstract int capacity();
 
@@ -322,6 +328,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
     /**
      * Returns the {@code readerIndex} of this buffer.
+     * 返回读指针
      */
     public abstract int readerIndex();
 
@@ -337,6 +344,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
     /**
      * Returns the {@code writerIndex} of this buffer.
+     * 返回写指针
      */
     public abstract int writerIndex();
 
@@ -463,6 +471,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Please note that the behavior of this method is different
      * from that of NIO buffer, which sets the {@code limit} to
      * the {@code capacity} of the buffer.
+     *
+     * 将此缓冲区的readerIndex和writerIndex设置为0 只是清除了指针，数据其实还在，只是你访问不到而已
      */
     public abstract ByteBuf clear();
 
@@ -2349,11 +2359,14 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Returns {@code true} if and only if this buffer has a backing byte array.
      * If this method returns true, you can safely call {@link #array()} and
      * {@link #arrayOffset()}.
+     * 当且仅当此缓冲区具有支持字节数组时才返回true
+     * 如果此方法返回 true，则可以安全地调用array()和arrayOffset() 。
      */
     public abstract boolean hasArray();
 
     /**
      * Returns the backing byte array of this buffer.
+     * 返回此缓冲区的支持字节数组
      *
      * @throws UnsupportedOperationException
      *         if there no accessible backing byte array
@@ -2363,6 +2376,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns the offset of the first byte within the backing byte array of
      * this buffer.
+     * 返回此缓冲区的后备字节数组中第一个字节的偏移量。
      *
      * @throws UnsupportedOperationException
      *         if there no accessible backing byte array

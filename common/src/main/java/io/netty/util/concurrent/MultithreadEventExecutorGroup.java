@@ -32,11 +32,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class MultithreadEventExecutorGroup extends AbstractEventExecutorGroup {
 
+    // NioEventGroup里面包含的 EventLoop 对象数组
     private final EventExecutor[] children;
     // children变量的只读形式
     private final Set<EventExecutor> readonlyChildren;
+    // 给EventLoop线程增加终止监听的 做自增用的
     private final AtomicInteger terminatedChildren = new AtomicInteger();
     private final Promise<?> terminationFuture = new DefaultPromise(GlobalEventExecutor.INSTANCE);
+    // 选择器对象 用来选择NioEventLoop
     private final EventExecutorChooserFactory.EventExecutorChooser chooser;
 
     /**

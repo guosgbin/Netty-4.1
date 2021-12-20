@@ -23,6 +23,8 @@ import java.util.concurrent.ThreadFactory;
 
 /**
  * Allow to retrieve the {@link EventExecutor} for the calling {@link Thread}.
+ * 为了能够在执行 Runnable 时，能够获取到当前是哪个 NioEventLoop 在执行当前的 Runnable
+ * 只要调用 ThreadExecutorMap.currentExecutor() 就能获取到执行当前 task 的 NioEventLoop
  */
 public final class ThreadExecutorMap {
 

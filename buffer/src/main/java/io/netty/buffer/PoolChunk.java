@@ -162,11 +162,14 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     /**
      * manage all avail runs
+     * 管理所有可用的run，这个数组的索引是SizeClasses中的page2PageIdx计算出来的idx
+     * 也就是sizeClass中的每个size 一个优先队列进行存储
      */
     private final LongPriorityQueue[] runsAvail;
 
     /**
      * manage all subpages in this chunk
+     * 管理这个poolChunk中的所有poolSubPage
      * 默认2048个8k的page页面
      */
     private final PoolSubpage<T>[] subpages;
@@ -183,13 +186,17 @@ final class PoolChunk<T> implements PoolChunkMetric {
     // may produce extra GC, which can be greatly reduced by caching the duplicates.
     //
     // This may be null if the PoolChunk is unpooled as pooling the ByteBuffer instances does not make any sense here.
+    // 主要是对PooledByteBuf中频繁创建的ByteBuffer进行缓存，以避免由于频繁创建对象导致频繁GC
     private final Deque<ByteBuffer> cachedNioBuffers;
 
     // 剩余可用大小
     int freeBytes;
 
+    // 当前PoolChunk所属的PoolChunkList
     PoolChunkList<T> parent;
+    // 双向链表中 当前PoolChunk的前一个的PoolChunk
     PoolChunk<T> prev;
+    // 双向链表中 当前PoolChunk的后一个的PoolChunk
     PoolChunk<T> next;
 
     // TODO: Test if adding padding helps under contention

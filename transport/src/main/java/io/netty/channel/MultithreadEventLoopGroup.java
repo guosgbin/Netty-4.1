@@ -29,6 +29,7 @@ import java.util.concurrent.ThreadFactory;
 /**
  * Abstract base class for {@link EventLoopGroup} implementations that handles their tasks with multiple threads at
  * the same time.
+ * EventLoopGroup实现的抽象基类，它同时处理多个线程的任务。
  */
 public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutorGroup implements EventLoopGroup {
 
