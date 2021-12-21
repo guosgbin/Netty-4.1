@@ -891,7 +891,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * @throws IndexOutOfBoundsException
      *         if the specified {@code index} is less than {@code 0} or
      *         if {@code index + dst.writableBytes} is greater than
-     *            {@code this.capacity} 这里啊啊啊
+     *            {@code this.capacity}
      */
     public abstract ByteBuf getBytes(int index, ByteBuf dst);
 

@@ -30,14 +30,29 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Abstract base class for {@link EventExecutor} implementations.
+ *
+ * EventExecutor实现的抽象基类
+ *
+ * ======================================
+ * 这个抽象基类做的事情是
+ *
+ * （1）创建一些对象，例如一些 Promise 和 Future 方法。
+ *
+ * （2）重写了 JDK 的 AbstractExecutorService 类中的一些方法，返回值改为 Netty 的 Future 和 RunnableFuture 对象。
+ *
+ * （3）AbstractEventExecutor 不支持延迟任务和周期任务，但是有个支持的抽象类 AbstractScheduledEventExecutor。
  */
 public abstract class AbstractEventExecutor extends AbstractExecutorService implements EventExecutor {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractEventExecutor.class);
 
+    // 调用 shutdownGracefully 方法默认安静期时间
     static final long DEFAULT_SHUTDOWN_QUIET_PERIOD = 2;
+    // 调用 shutdownGracefully 方法默认 shutdown 超时时间
     static final long DEFAULT_SHUTDOWN_TIMEOUT = 15;
 
+    // 父的 EventExecutorGroup，在构造方法中传递
     private final EventExecutorGroup parent;
+    // 只包含自己的集合 selfCollection
     private final Collection<EventExecutor> selfCollection = Collections.<EventExecutor>singleton(this);
 
     protected AbstractEventExecutor() {
@@ -110,47 +125,76 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
         return new FailedFuture<V>(this, cause);
     }
 
+    /**
+     * 要将返回值变成 netty 的 Future
+     */
     @Override
     public Future<?> submit(Runnable task) {
         return (Future<?>) super.submit(task);
     }
 
+    /**
+     * 要将返回值变成 netty 的 Future
+     */
     @Override
     public <T> Future<T> submit(Runnable task, T result) {
         return (Future<T>) super.submit(task, result);
     }
 
+    /**
+     * 要将返回值变成 netty 的 Future
+     */
     @Override
     public <T> Future<T> submit(Callable<T> task) {
         return (Future<T>) super.submit(task);
     }
 
+    /**
+     * 必须复写 newTaskFor 方法，改变 AbstractExecutorService 的实现；
+     * 将返回值的 RunnableFuture 变成 netty 的 RunnableFuture 实现类 PromiseTask
+     */
     @Override
     protected final <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
         return new PromiseTask<T>(this, runnable, value);
     }
 
+    /**
+     * 必须复写 newTaskFor 方法，改变 AbstractExecutorService 的实现；
+     * 将返回值的 RunnableFuture 变成 netty 的 RunnableFuture 实现类 PromiseTask
+     */
     @Override
     protected final <T> RunnableFuture<T> newTaskFor(Callable<T> callable) {
         return new PromiseTask<T>(this, callable);
     }
 
+    /**
+     * 当前 AbstractEventExecutor 不支持延时和周期性任务
+     */
     @Override
     public ScheduledFuture<?> schedule(Runnable command, long delay,
                                        TimeUnit unit) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * 当前 AbstractEventExecutor 不支持延时和周期性任务
+     */
     @Override
     public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * 当前 AbstractEventExecutor 不支持延时和周期性任务
+     */
     @Override
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * 当前 AbstractEventExecutor 不支持延时和周期性任务
+     */
     @Override
     public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit) {
         throw new UnsupportedOperationException();
@@ -158,6 +202,8 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
 
     /**
      * Try to execute the given {@link Runnable} and just log if it throws a {@link Throwable}.
+     *
+     * 尝试执行给定的Runnable并记录它是否抛出Throwable
      */
     protected static void safeExecute(Runnable task) {
         try {
@@ -168,6 +214,11 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
     }
 
     /**
+     * 与execute(Runnable)类似，但不保证任务将运行，直到非惰性任务被执行或执行器关闭。
+     * 默认实现只是委托执行(Runnable)
+     */
+
+    /**
      * Like {@link #execute(Runnable)} but does not guarantee the task will be run until either
      * a non-lazy task is executed or the executor is shut down.
      *
@@ -175,6 +226,9 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
      * {@link #execute(Runnable)} but for an arbitrary {@link Runnable}.
      *
      * The default implementation just delegates to {@link #execute(Runnable)}.
+     *
+     * 与execute(Runnable)类似，但不保证任务 会在执行非延迟任务或Executor关闭之前运行。
+     * 默认实现只是委托给execute(Runnable)
      */
     @UnstableApi
     public void lazyExecute(Runnable task) {
@@ -184,6 +238,8 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
     /**
      * Marker interface for {@link Runnable} to indicate that it should be queued for execution
      * but does not need to run immediately.
+     *
+     * Runnable标记接口，指示它应该排队等待执行但不需要立即运行。
      */
     @UnstableApi
     public interface LazyRunnable extends Runnable { }

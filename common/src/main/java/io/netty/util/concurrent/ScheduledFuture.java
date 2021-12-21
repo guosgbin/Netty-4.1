@@ -17,6 +17,8 @@ package io.netty.util.concurrent;
 
 /**
  * The result of an scheduled asynchronous operation.
+ *
+ * 它是一个优先级PriorityQueueNode 节点，也代表一个延时或者周期性任务 PromiseTask
  */
 @SuppressWarnings("ClassNameSameAsAncestorName")
 public interface ScheduledFuture<V> extends Future<V>, java.util.concurrent.ScheduledFuture<V> {

@@ -25,12 +25,22 @@ import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("ComparableImplementedButEqualsNotOverridden")
 final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFuture<V>, PriorityQueueNode {
+    // 我们不管是延时任务还是周期性任务都有任务执行的截止时间 deadlineNanos，截止时间到了就会执行任务。
+    // 所以 netty 设置了一个基准时间 START_TIME
     private static final long START_TIME = System.nanoTime();
 
+    /**
+     * 程序执行了多少纳秒值。因为是当前纳秒值和程序开始时间纳秒值之差
+     * @return
+     */
     static long nanoTime() {
         return System.nanoTime() - START_TIME;
     }
 
+    /**
+     * 将用户自定义的延时时间 转换成 截止时间 deadlineNanos，
+     * 即 System.nanoTime() - START_TIME + delay
+     */
     static long deadlineNanos(long delay) {
         long deadlineNanos = nanoTime() + delay;
         // Guard against overflow
@@ -46,10 +56,20 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
 
     private long deadlineNanos;
     /* 0 - no repeat, >0 - repeat at fixed rate, <0 - repeat with fixed delay */
+    // 0 不重复
+    // > 0 以固定速率重复
+    // < 0 以固定延迟重复
     private final long periodNanos;
 
     private int queueIndex = INDEX_NOT_IN_QUEUE;
 
+    /**
+     * 创建一个延迟任务
+     *
+     * @param executor
+     * @param runnable
+     * @param nanoTime
+     */
     ScheduledFutureTask(AbstractScheduledEventExecutor executor,
             Runnable runnable, long nanoTime) {
 
@@ -114,14 +134,25 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
         }
     }
 
+    /**
+     * 当前剩余的时间
+     * 即 使用截止时间deadlineNanos - 当前时间真实值 nanoTime()
+     */
     public long delayNanos() {
         return deadlineToDelayNanos(deadlineNanos());
     }
 
+    /**
+     * 截止时间转换成剩余时间
+     */
     static long deadlineToDelayNanos(long deadlineNanos) {
         return deadlineNanos == 0L ? 0L : Math.max(0L, deadlineNanos - nanoTime());
     }
 
+    /**
+     * 获取到指定时间戳 currentTimeNanos 时，还剩余的时间纳秒值
+     * 即 截止时间deadlineNanos - ( currentTimeNanos - START_TIME)
+     */
     public long delayNanos(long currentTimeNanos) {
         return deadlineNanos == 0L ? 0L
                 : Math.max(0L, deadlineNanos() - (currentTimeNanos - START_TIME));

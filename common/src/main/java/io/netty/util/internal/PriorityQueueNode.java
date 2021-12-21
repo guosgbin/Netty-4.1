@@ -18,10 +18,18 @@ package io.netty.util.internal;
 /**
  * Provides methods for {@link DefaultPriorityQueue} to maintain internal state. These methods should generally not be
  * used outside the scope of {@link DefaultPriorityQueue}.
+ *
+ * 为 DefaultPriorityQueue 提供方法以维护内部状态。
+ * 这些方法通常不应在 DefaultPriorityQueue 范围之外使用。
+ *
+ * ================================================
+ * 表示优先级队列中节点的接口类，主要提供两个设置节点索引的方法。
  */
 public interface PriorityQueueNode {
     /**
      * This should be used to initialize the storage returned by {@link #priorityQueueIndex(DefaultPriorityQueue)}.
+     *
+     * 表示节点不在队列中
      */
     int INDEX_NOT_IN_QUEUE = -1;
 
@@ -30,6 +38,8 @@ public interface PriorityQueueNode {
      * {@code queue}.
      * <p>
      * Throwing exceptions from this method will result in undefined behavior.
+     *
+     * 获取由 priorityQueueIndex(DefaultPriorityQueue, int) 为queue对应的值设置的最后一个值。
      */
     int priorityQueueIndex(DefaultPriorityQueue<?> queue);
 
@@ -37,6 +47,9 @@ public interface PriorityQueueNode {
      * Used by {@link DefaultPriorityQueue} to maintain state for an element in the queue.
      * <p>
      * Throwing exceptions from this method will result in undefined behavior.
+     *
+     * 由 DefaultPriorityQueue 用于维护队列中元素的状态。
+     *
      * @param queue The queue for which the index is being set.
      * @param i The index as used by {@link DefaultPriorityQueue}.
      */
