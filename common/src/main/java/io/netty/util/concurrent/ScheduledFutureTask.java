@@ -57,8 +57,8 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
     private long deadlineNanos;
     /* 0 - no repeat, >0 - repeat at fixed rate, <0 - repeat with fixed delay */
     // 0 不重复
-    // > 0 以固定速率重复
-    // < 0 以固定延迟重复
+    // > 0 以固定速率重复  周期任务
+    // < 0 以固定延迟重复  延迟任务
     private final long periodNanos;
 
     private int queueIndex = INDEX_NOT_IN_QUEUE;
@@ -75,9 +75,18 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
 
         super(executor, runnable);
         deadlineNanos = nanoTime;
+        // 因为是延迟任务 所以为0
         periodNanos = 0;
     }
 
+    /**
+     * 创建周期性任务
+     *
+     * @param executor
+     * @param runnable
+     * @param nanoTime
+     * @param period
+     */
     ScheduledFutureTask(AbstractScheduledEventExecutor executor,
             Runnable runnable, long nanoTime, long period) {
 
@@ -86,6 +95,14 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
         periodNanos = validatePeriod(period);
     }
 
+    /**
+     * 创建周期性任务
+     *
+     * @param executor
+     * @param callable
+     * @param nanoTime
+     * @param period
+     */
     ScheduledFutureTask(AbstractScheduledEventExecutor executor,
             Callable<V> callable, long nanoTime, long period) {
 
@@ -94,6 +111,13 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
         periodNanos = validatePeriod(period);
     }
 
+    /**
+     * 创建一个延迟任务
+     *
+     * @param executor
+     * @param callable
+     * @param nanoTime
+     */
     ScheduledFutureTask(AbstractScheduledEventExecutor executor,
             Callable<V> callable, long nanoTime) {
 
@@ -183,32 +207,49 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
         }
     }
 
+    /**
+     * 运行任务
+     */
     @Override
     public void run() {
+        // 当前线程是否是 Executor 执行器的线程
         assert executor().inEventLoop();
         try {
+            // delayNanos() > 0L 表示任务截止时间还没有到
             if (delayNanos() > 0L) {
                 // Not yet expired, need to add or remove from queue
                 if (isCancelled()) {
+                    // 任务已经被取消，那么就从列表中移除
                     scheduledExecutor().scheduledTaskQueue().removeTyped(this);
                 } else {
+                    // 否则将任务重新放回队列
                     scheduledExecutor().scheduleFromEventLoop(this);
                 }
                 return;
             }
+            // 走到此处前置条件 任务截止时间已经到了
             if (periodNanos == 0) {
+                // periodNanos == 0 表示只是延时任务。
+                // 先将任务设置成不可取消
                 if (setUncancellableInternal()) {
                     V result = runTask();
+                    // 设置 PromiseTask 为成功，进行通知
                     setSuccessInternal(result);
                 }
             } else {
                 // check if is done as it may was cancelled
-                if (!isCancelled()) {
+                if (!isCancelled()) { // 检查任务是否被取消
                     runTask();
-                    if (!executor().isShutdown()) {
+                    if (!executor().isShutdown()) { // 判断执行器是否被终止
                         if (periodNanos > 0) {
+                            // periodNanos > 0 表示固定周期，那么下一次执行时间就是
+                            // 本次截止时间deadlineNanos + 周期时间 periodNanos
+                            // 但是这个值可能小于当前时间啊，只要任务执行时间比周期时间 periodNanos大，
+                            // 那么这个值就小于当前时间。就代表会立即运行
                             deadlineNanos += periodNanos;
                         } else {
+                            // periodNanos < 0 表示固定延时。
+                            // 使用当前时间 nanoTime() 加上固定延时时间(- periodNanos)
                             deadlineNanos = nanoTime() - periodNanos;
                         }
                         if (!isCancelled()) {

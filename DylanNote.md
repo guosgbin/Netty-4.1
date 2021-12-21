@@ -23,5 +23,18 @@ ByteBuf分类，作用
 ## EventExecutor和EventLoop的抽象基类 
 - AbstractEventExecutor
     - AbstractScheduledEventExecutor
-    
-    https://www.jianshu.com/p/6c25b6386326
+  
+定时器相关
+
+- PriorityQueue 接口
+- PriorityQueueNode 接口
+- ScheduledFutureTask
+- DefaultPriorityQueue 优先队列
+- AbstractScheduledEventExecutor 抽象类
+
+===========
+
+- SingleThreadEventExecutor
+- ThreadExecutorMap
+
+> https://www.jianshu.com/p/6c25b6386326
