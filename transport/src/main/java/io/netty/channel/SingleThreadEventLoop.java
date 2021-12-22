@@ -29,12 +29,14 @@ import java.util.concurrent.ThreadFactory;
 /**
  * Abstract base class for {@link EventLoop}s that execute all its submitted tasks in a single thread.
  *
+ * 在单个线程中执行所有提交的任务
  */
 public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor implements EventLoop {
 
     protected static final int DEFAULT_MAX_PENDING_TASKS = Math.max(16,
             SystemPropertyUtil.getInt("io.netty.eventLoop.maxPendingTasks", Integer.MAX_VALUE));
 
+    // 每次事件轮询迭代结束时执行任务队列， 即尾部任务队列
     private final Queue<Runnable> tailTasks;
 
     protected SingleThreadEventLoop(EventLoopGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp) {
@@ -103,12 +105,14 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
 
     /**
      * Adds a task to be run once at the end of next (or current) {@code eventloop} iteration.
+     * 添加一个在下一次(或当前) eventloop 迭代结束时运行一次的任务。
      *
      * @param task to be added.
      */
     @UnstableApi
     public final void executeAfterEventLoopIteration(Runnable task) {
         ObjectUtil.checkNotNull(task, "task");
+        // 执行器状态已经是完全 Shutdown 之后了，那么拒绝任务
         if (isShutdown()) {
             reject();
         }
@@ -124,6 +128,7 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
 
     /**
      * Removes a task that was added previously via {@link #executeAfterEventLoopIteration(Runnable)}.
+     * 移除之前通过executeAfterEventLoopIteration(Runnable)添加的任务。
      *
      * @param task to be removed.
      *
@@ -134,6 +139,10 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
         return tailTasks.remove(ObjectUtil.checkNotNull(task, "task"));
     }
 
+    /**
+     * 在 runAllTasks() 和 runAllTasks(long) 方法返回之前调用。
+     * 每次迭代结束时，运行所有尾部队列tailTasks任务
+     */
     @Override
     protected void afterRunningAllTasks() {
         runAllTasksFrom(tailTasks);

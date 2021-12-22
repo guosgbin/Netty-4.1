@@ -53,6 +53,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * {@link SingleThreadEventLoop} implementation which register the {@link Channel}'s to a
  * {@link Selector} and so does the multi-plexing of these in the event loop.
  *
+ * SingleThreadEventLoop的一个实现
+ * 将Channel注册到Selector并且在事件循环中对这些进行多路复用。
+ *
+ * netty 是如何通过一个事件轮询器管理多个嵌套字 Socket 的通道 channel。
+ * 又是如何即处理通道的 channel 的 IO 事件，以及添加事件轮询器上任务的。
  */
 public final class NioEventLoop extends SingleThreadEventLoop {
 
@@ -286,7 +291,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         selectedKeys = selectedKeySet;
         logger.trace("instrumented a special java.util.Set into: {}", unwrappedSelector);
         return new SelectorTuple(unwrappedSelector,
-                                 new SelectedSelectionKeySetSelector(unwrappedSelector, selectedKeySet));
+                                 new SelectedSelectionKeySetSelector(unwrappedSelector, AbstractSelectableChannel ));
     }
 
     /**
@@ -311,6 +316,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
      * Registers an arbitrary {@link SelectableChannel}, not necessarily created by Netty, to the {@link Selector}
      * of this event loop.  Once the specified {@link SelectableChannel} is registered, the specified {@code task} will
      * be executed by this event loop when the {@link SelectableChannel} is ready.
+     *
+     * 将任意SelectableChannel注册到此事件循环的Selector ，不一定由 Netty 创建。
+     * 一旦指定的SelectableChannel被注册，当SelectableChannel准备好时，指定的task将被这个事件循环执行
      */
     public void register(final SelectableChannel ch, final int interestOps, final NioTask<?> task) {
         ObjectUtil.checkNotNull(ch, "ch");
@@ -328,11 +336,13 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
 
         if (inEventLoop()) {
+            // 在事件轮询器线程中，直接调用 register0 方法注册
             register0(ch, interestOps, task);
         } else {
             try {
                 // Offload to the EventLoop as otherwise java.nio.channels.spi.AbstractSelectableChannel.register
                 // may block for a long time while trying to obtain an internal lock that may be hold while selecting.
+                // 调用 submit  方法，确保在轮询器线程中注册
                 submit(new Runnable() {
                     @Override
                     public void run() {
@@ -341,6 +351,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 }).sync();
             } catch (InterruptedException ignore) {
                 // Even if interrupted we did schedule it so just mark the Thread as interrupted.
+                // 即使被中断了，我们也会调度它，所以只需将线程标记为中断。
                 Thread.currentThread().interrupt();
             }
         }
@@ -348,6 +359,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private void register0(SelectableChannel ch, int interestOps, NioTask<?> task) {
         try {
+            // 将通道 ch 注册到选择器 unwrappedSelector 中
             ch.register(unwrappedSelector, interestOps, task);
         } catch (Exception e) {
             throw new EventLoopException("failed to register a channel", e);
@@ -493,6 +505,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         // fall-through to SELECT since the busy-wait is not supported with NIO
 
                     case SelectStrategy.SELECT:
+                        // 返回下一个计划任务准备运行的截止时间纳秒值
                         // 返回-1表示 NioEventLoop中没有需要周期性调度的任务
                         long curDeadlineNanos = nextScheduledTaskDeadlineNanos();
                         if (curDeadlineNanos == -1L) {
@@ -885,20 +898,41 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         return unwrappedSelector;
     }
 
+    /**
+     * 返回注册在该 Selector 上的已经准备好进行I/O操作的通道 channel 的数量。
+     * 如果还没有准备好的通道 channel ，那么直接返回 0，不会阻塞当前线程。
+     */
     int selectNow() throws IOException {
         return selector.selectNow();
     }
 
+    /**
+     * 阻塞获取
+     *
+     * @param deadlineNanos
+     * @return
+     * @throws IOException
+     */
     private int select(long deadlineNanos) throws IOException {
         // 当前没有周期性任务，直接阻塞当前调用线程，直到就绪事件发生，返回就绪事件个数
+
+        // 如果截止时间 deadlineNanos 是NONE(无限大)
+        // 那么就使用 selector.select() 方法，不设置超时，
+        // 一直阻塞等待，直到有注册在该 selector 上通道 channel 已经准备好进行I/O操作，
+        // 才停止阻塞，返回准备好I/O操作 channel 的数量。
         if (deadlineNanos == NONE) {
             return selector.select();
         }
         // Timeout will only be 0 if deadline is within 5 microsecs
+        // 计算调用 selector.select(timeoutMillis) 的超时阻塞等待时间。
+        // 如果截止时间在5微秒内，超时时间将视为0
         long timeoutMillis = deadlineToDelayNanos(deadlineNanos + 995000L) / 1000000L;
         return timeoutMillis <= 0 ? selector.selectNow() : selector.select(timeoutMillis);
     }
 
+    /**
+     * 重新获取 IO 事件，即再次调用 selector.selectNow()， 不阻塞线程
+     */
     private void selectAgain() {
         needsToSelectAgain = false;
         try {

@@ -35,6 +35,10 @@ ByteBuf分类，作用
 ===========
 
 - SingleThreadEventExecutor
+    - DefaultEventExecutor
+    - NioEventLoop
 - ThreadExecutorMap
 
+
+https://www.jianshu.com/p/cf57f20b4cb9
 > https://www.jianshu.com/p/6c25b6386326

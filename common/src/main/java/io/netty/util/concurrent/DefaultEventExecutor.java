@@ -16,11 +16,14 @@
 package io.netty.util.concurrent;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
 /**
  * Default {@link SingleThreadEventExecutor} implementation which just execute all submitted task in a
  * serial fashion.
+ *
+ * 默认的SingleThreadEventExecutor实现，它只是以串行方式执行所有提交的任务。
  */
 public final class DefaultEventExecutor extends SingleThreadEventExecutor {
 
@@ -60,16 +63,47 @@ public final class DefaultEventExecutor extends SingleThreadEventExecutor {
 
     @Override
     protected void run() {
+        // 利用死循环，获取任务队列中的任务
         for (;;) {
+            System.out.println(Thread.currentThread() + "==========");
+            // 获取任务，如果任务队列为空，将会被阻塞
+            // 直到有任务添加，或者线程被中断
             Runnable task = takeTask();
             if (task != null) {
                 task.run();
                 updateLastExecutionTime();
             }
 
+            // 这里的判断非常重要，当执行器是开始 Shutdown 之后的状态，
+            // 那么就要跳出死循环了
             if (confirmShutdown()) {
                 break;
             }
+        }
+    }
+
+    public static void main(String[] agrs) {
+        // 池子只给1个线程，下面只会打印一个数据。
+        // 给5个线程就好了
+//        final Executor executor = Executors.newFixedThreadPool(1);
+        final Executor executor = Executors.newFixedThreadPool(5);
+
+        for (int index = 0; index < 5; index++) {
+            final int tempIndex = index;
+            DefaultEventExecutor eventExecutor = new DefaultEventExecutor(executor);
+            System.out.println("index: "+tempIndex);
+            eventExecutor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    System.out.println("thread: "+Thread.currentThread()+"   开始 index:"+ tempIndex);
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("thread: "+Thread.currentThread()+"   结束  index:"+ tempIndex);
+                }
+            });
         }
     }
 }
