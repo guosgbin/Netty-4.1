@@ -28,8 +28,15 @@ import static io.netty.util.concurrent.AbstractEventExecutor.*;
 
 /**
  * Abstract base class for {@link EventExecutorGroup} implementations.
+ *
+ * 所有处理任务的方法都是交给 next() 方法返回的执行器去处理
  */
 public abstract class AbstractEventExecutorGroup implements EventExecutorGroup {
+    /**
+     * 通过 next() 方法选择一个 Group 内管理的 EventExecutor 来处理任务
+     * @param task
+     * @return
+     */
     @Override
     public Future<?> submit(Runnable task) {
         return next().submit(task);

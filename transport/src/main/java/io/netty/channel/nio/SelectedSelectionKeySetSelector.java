@@ -21,6 +21,13 @@ import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Set;
 
+/**
+ * Netty 优化后的 SelectedSelectionKeySetSelector
+ *
+ * 大部分功能都是委托给 JDK 原生的 Selector 去处理
+ * 主要是优化了 JDK 的 SelectorImpl 的 selectedKeys 和 publicSelectedKeys 字段。
+ * 因为这两个字段都是 HashSet 结构，
+ */
 final class SelectedSelectionKeySetSelector extends Selector {
     private final SelectedSelectionKeySet selectionKeys;
     private final Selector delegate;

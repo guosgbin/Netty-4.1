@@ -190,6 +190,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
 
     @Override
     public Future<?> shutdownGracefully(long quietPeriod, long timeout, TimeUnit unit) {
+        // 通过循环遍历，关闭所管理的所有子事件轮询器 EventExecutor
         for (EventExecutor l: children) {
             l.shutdownGracefully(quietPeriod, timeout, unit);
         }
@@ -211,6 +212,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
 
     @Override
     public boolean isShuttingDown() {
+        // 只有当所有子事件轮询器 EventExecutor 都isShuttingDown，返回true
         for (EventExecutor l: children) {
             if (!l.isShuttingDown()) {
                 return false;
@@ -221,6 +223,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
 
     @Override
     public boolean isShutdown() {
+        // 只有当所有子事件轮询器 EventExecutor 都isShutdown，返回true
         for (EventExecutor l: children) {
             if (!l.isShutdown()) {
                 return false;

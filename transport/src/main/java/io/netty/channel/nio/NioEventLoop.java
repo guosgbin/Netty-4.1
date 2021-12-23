@@ -291,7 +291,12 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         selectedKeys = selectedKeySet;
         logger.trace("instrumented a special java.util.Set into: {}", unwrappedSelector);
         return new SelectorTuple(unwrappedSelector,
-                                 new SelectedSelectionKeySetSelector(unwrappedSelector, AbstractSelectableChannel ));
+                                 new SelectedSelectionKeySetSelector(unwrappedSelector, selectedKeySet));
+    }
+
+    public static void main(String[] args) {
+        NioEventLoopGroup group = new NioEventLoopGroup();
+        System.out.println(group);
     }
 
     /**
