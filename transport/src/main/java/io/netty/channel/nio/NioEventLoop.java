@@ -63,12 +63,14 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioEventLoop.class);
 
+    // 每当256个Channel从Selector上移除时，就会去标记needsToSelectAgain为true
     private static final int CLEANUP_INTERVAL = 256; // XXX Hard-coded value, but won't need customization.
 
     private static final boolean DISABLE_KEY_SET_OPTIMIZATION =
             SystemPropertyUtil.getBoolean("io.netty.noKeySetOptimization", false);
 
     private static final int MIN_PREMATURE_SELECTOR_RETURNS = 3;
+    // 超过指定次数就会重建 Selector，为了修复NIO的空轮询bug
     private static final int SELECTOR_AUTO_REBUILD_THRESHOLD;
 
     private final IntSupplier selectNowSupplier = new IntSupplier() {
@@ -687,6 +689,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
         // Prevent possible consecutive immediate failures that lead to
         // excessive CPU consumption.
+        // 避免可能出现的连续的直接故障导致CPU占用过多。
         try {
             Thread.sleep(1000);
         } catch (InterruptedException e) {
