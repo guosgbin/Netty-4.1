@@ -46,6 +46,12 @@ ByteBuf分类，作用
 - EventExecutorChooser
 - MultithreadEventLoopGroup
 - NioEventLoopGroup
+- NIoEventLoop
+
+## Channel
+- Channel 接口
+- ChannelInboundHandler 和 ChannelInboundInvoker
+- ChannelOutboundHandler 和 
 
 
 https://www.jianshu.com/p/cf57f20b4cb9

@@ -73,21 +73,46 @@ import java.net.SocketAddress;
  * It is important to call {@link #close()} or {@link #close(ChannelPromise)} to release all
  * resources once you are done with the {@link Channel}. This ensures all resources are
  * released in a proper way, i.e. filehandles.
+ *
+ * 通道Channel 指的是网络套接字socket或能够进行读、写、连接和绑定等I/O操作的组件。
+ * 通道Channel为用户提供:
+ *（1）通道的当前状态(例如，它是打开的吗?它是连接吗?)
+ *（2）通道的配置参数(例如接收缓冲区大小)
+ *（3） 通道支持的I/O操作(例如读、写、连接和绑定)
+ *（4）通过 ChannelPipeline处理与通道相关的所有I/O事件和请求。
+ *
+ * Netty中的所有I/O操作都是异步的。
+ *
+ *      这意味着任何I/O调用将立即返回，而不保证请求的I/O操作在调用结束时已经完成。
+ * 相反，您得到一个ChannelFuture实例，该实例将在请求的I/O操作成功、失败或取消时通知您。
+ *
+ * 释放资源
+ *
+ *      当通道 Channel 完结的时候，调用close()或close(ChannelPromise) 方法来释放它所持有的资源是非常重要的。
+ * 可以确保了所有资源都以适当的方式释放，例如文件句柄。
+ *
+ *
+ * Channel 实现了 ChannelOutboundInvoker 接口说明了 Channel 可以发送出站的IO操作
  */
 public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparable<Channel> {
 
     /**
      * Returns the globally unique identifier of this {@link Channel}.
+     *
+     * 返回 Channel 的全局唯一标识
      */
     ChannelId id();
 
     /**
      * Return the {@link EventLoop} this {@link Channel} was registered to.
+     *
+     * 返回此 Channel 绑定的 EventLoop 对象
      */
     EventLoop eventLoop();
 
     /**
      * Returns the parent of this channel.
+     * 返回此 Channel 的父 Channel
      *
      * @return the parent channel.
      *         {@code null} if this channel does not have a parent channel.
@@ -96,26 +121,36 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
 
     /**
      * Returns the configuration of this channel.
+     *
+     * 返回此 Channel 的配置对象
      */
     ChannelConfig config();
 
     /**
      * Returns {@code true} if the {@link Channel} is open and may get active later
+     *
+     * 如果此 Channel 是打开状态或者是待会儿可能会激活 则返回true
      */
     boolean isOpen();
 
     /**
      * Returns {@code true} if the {@link Channel} is registered with an {@link EventLoop}.
+     *
+     * 假如 Channel 已经被注册到 EventLoop 则返回 true
      */
     boolean isRegistered();
 
     /**
      * Return {@code true} if the {@link Channel} is active and so connected.
+     *
+     * 假如 Channel 是 active 的返回 true
      */
     boolean isActive();
 
     /**
      * Return the {@link ChannelMetadata} of the {@link Channel} which describe the nature of the {@link Channel}.
+     *
+     * 返回描述通道性质相关的元数据
      */
     ChannelMetadata metadata();
 
@@ -124,6 +159,8 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
      * {@link SocketAddress} is supposed to be down-cast into more concrete
      * type such as {@link InetSocketAddress} to retrieve the detailed
      * information.
+     * 返回此通道绑定到的本地地址。如果此通道未绑定，则返回 null。
+     * 返回的 SocketAddress 应该被向下转换为更具体的类型，例如 InetSocketAddress，以检索详细信息。
      *
      * @return the local address of this channel.
      *         {@code null} if this channel is not bound.
@@ -135,6 +172,9 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
      * returned {@link SocketAddress} is supposed to be down-cast into more
      * concrete type such as {@link InetSocketAddress} to retrieve the detailed
      * information.
+     *
+     * 返回此通道连接到的远程地址。
+     * 返回的SocketAddress应该被向下转换为更具体的类型，例如 InetSocketAddress，以检索详细信息。
      *
      * @return the remote address of this channel.
      *         {@code null} if this channel is not connected.
@@ -149,6 +189,8 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     /**
      * Returns the {@link ChannelFuture} which will be notified when this
      * channel is closed.  This method always returns the same future instance.
+     *
+     * 返回 ChannelFuture，当此通道关闭时，将通知这个ChannelFuture
      */
     ChannelFuture closeFuture();
 
@@ -190,6 +232,9 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     @Override
     Channel read();
 
+    /**
+     * 将写缓存区的数据，全部刷新到远程节点
+     */
     @Override
     Channel flush();
 
@@ -211,30 +256,41 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
         /**
          * Return the assigned {@link RecvByteBufAllocator.Handle} which will be used to allocate {@link ByteBuf}'s when
          * receiving data.
+         *
+         * 返回分配的 RecvByteBufAllocator.Handle，用于在接收数据时分配 ByteBuf
          */
         RecvByteBufAllocator.Handle recvBufAllocHandle();
 
         /**
          * Return the {@link SocketAddress} to which is bound local or
          * {@code null} if none.
+         *
+         * 返回绑定到本地的 SocketAddress，如果没有则返回 null
          */
         SocketAddress localAddress();
 
         /**
          * Return the {@link SocketAddress} to which is bound remote or
          * {@code null} if none is bound yet.
+         *
+         * 返回被绑定为远程的SocketAddress，如果还没有绑定，则返回null
          */
         SocketAddress remoteAddress();
 
         /**
          * Register the {@link Channel} of the {@link ChannelPromise} and notify
          * the {@link ChannelFuture} once the registration was complete.
+         *
+         * 将给定的ChannelPromise的对应的通道Channel 注册到给定的事件轮询器 EventLoop；
+         * 并在注册完成后通知 ChannelPromise。
          */
         void register(EventLoop eventLoop, ChannelPromise promise);
 
         /**
          * Bind the {@link SocketAddress} to the {@link Channel} of the {@link ChannelPromise} and notify
          * it once its done.
+         *
+         * 将本地的SocketAddress绑定到ChannelPromise的Channel，并在绑定完成后通知它
          */
         void bind(SocketAddress localAddress, ChannelPromise promise);
 
@@ -243,6 +299,10 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
          * If a specific local {@link SocketAddress} should be used it need to be given as argument. Otherwise just
          * pass {@code null} to it.
          *
+         * 将给定ChannelPromise的通道Channel与给定的远程SocketAddress进行连接,
+         * 同时绑定到localAddress;
+         * 一旦连接操作完成，ChannelPromise将得到通知
+         *
          * The {@link ChannelPromise} will get notified once the connect operation was complete.
          */
         void connect(SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise);
@@ -250,12 +310,18 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
         /**
          * Disconnect the {@link Channel} of the {@link ChannelFuture} and notify the {@link ChannelPromise} once the
          * operation was complete.
+         *
+         * 断开给定ChannelPromise的通道Channel的连接，
+         * 一旦断开连接操作完成，ChannelPromise将得到通知
          */
         void disconnect(ChannelPromise promise);
 
         /**
          * Close the {@link Channel} of the {@link ChannelPromise} and notify the {@link ChannelPromise} once the
          * operation was complete.
+         *
+         * 关闭给定ChannelPromise的通道Channel，
+         * 一旦关闭操作完成，ChannelPromise将得到通知
          */
         void close(ChannelPromise promise);
 
@@ -268,22 +334,29 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
         /**
          * Deregister the {@link Channel} of the {@link ChannelPromise} from {@link EventLoop} and notify the
          * {@link ChannelPromise} once the operation was complete.
+         *
+         * 立即关闭通道而不触发任何事件。
+         * 可能只有注册尝试失败时才调用。
          */
         void deregister(ChannelPromise promise);
 
         /**
          * Schedules a read operation that fills the inbound buffer of the first {@link ChannelInboundHandler} in the
          * {@link ChannelPipeline}.  If there's already a pending read operation, this method does nothing.
+         *
+         * 调度一个读操作，以填充ChannelPipeline中第一个ChannelInboundHandler的入站缓冲区。
          */
         void beginRead();
 
         /**
          * Schedules a write operation.
+         * 调度写操作
          */
         void write(Object msg, ChannelPromise promise);
 
         /**
          * Flush out all write operations scheduled via {@link #write(Object, ChannelPromise)}.
+         * 将写缓存区的数据，全部刷新到远程节点
          */
         void flush();
 
@@ -291,11 +364,18 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
          * Return a special ChannelPromise which can be reused and passed to the operations in {@link Unsafe}.
          * It will never be notified of a success or error and so is only a placeholder for operations
          * that take a {@link ChannelPromise} as argument but for which you not want to get notified.
+         *
+         * 返回一个特殊的ChannelPromise，它可以被重用和传递给Channel.Unsafe中的操作。
+         * 它永远不会不接收通知(成功和失败的通知都不接收)，所以它只是一个占位符
+         * 用于那些接受`ChannelPromise`作为参数但是不想得到通知的方法
          */
         ChannelPromise voidPromise();
 
         /**
          * Returns the {@link ChannelOutboundBuffer} of the {@link Channel} where the pending write requests are stored.
+         *
+         * 返回 写缓冲区 ChannelOutboundBuffer 对象，
+         * 它缓存了通道Channel 的写数据
          */
         ChannelOutboundBuffer outboundBuffer();
     }

@@ -174,17 +174,51 @@ import java.lang.annotation.Target;
  * {@link ChannelPipeline} to find out more about inbound and outbound operations,
  * what fundamental differences they have, how they flow in a  pipeline,  and how to handle
  * the operation in your application.
+ *
+ * （1) 概述
+ * 处理器 ChannelHandler 就是用来处理I/O事件或拦截I/O操作，
+ * 并将其转发到所属管道 ChannelPipeline 中的下一个处理器 ChannelHandler。
+ *
+ * （2）子类型
+ * ChannelHandler 本身并没有提供很多方法，但是你通常必须实现它的一个子类型:
+ * 1.ChannelInboundHandler 处理入站I/O事件。
+ * 2.ChannelOutboundHandler 处理出站I/O操作。
+ *
+ * 此外，为了方便使用，还提供了以下适配器类
+ * 1.ChannelInboundHandlerAdapter 处理入站I/O事件。
+ * 2.ChannelOutboundHandlerAdapter 用于处理出站I/O操作。
+ * 3.ChannelDuplexHandler 处理入站和出站事件。
+ *
+ * （3）上下文对象
+ * 将 ChannelHandler 添加到管道时，会创建这个 ChannelHandler 的上下文对象添加到管道中。
+ * ChannelHandler通过上下文对象与它所属的ChannelPipeline进行交互。
+ * 使用上下文对象，ChannelHandler可以向上游或下游传递事件，动态修改管道，或者存储特定于该处理器的信息(使用AttributeKeys)。
+ *
+ * （4）状态管理
+ * ChannelHandler经常需要存储一些状态信息，有两种方式:
+ *  1.最简单和推荐的方法是直接使用成员变量，看上面的英文例子
+ *  直接使用ChannelHandler成员变量loggedIn 来记录当前的登录状态。
+ *  因为使用ChannelHandler成员变量保存状态，所以这个处理器在每个管道ChannelPipeline(也是每个通道Channel)中都是新的处理程序实例，不能和别的通道共享同一个ChannelHandler实例。
+ *
+ *  2.使用AttributeKeys
+ *  尽管建议使用成员变量来存储处理程序的状态，但出于某些原因，你可能不想创建许多处理程序实例
+ *  在这种情况下，你可以使用上下文 ChannelHandlerContext 提供的 AttributeKeys 存储信息:
+ *  注意这里的ChannelHandler 子类必须使用 @Sharable 注解修饰，否则会抛出异常。
+ * 如果你想只创建一次该ChannelHandler的实例，并将其多次添加到一个或多个ChannelPipeline中，必须使用 @Sharable 注解修饰。
  */
 public interface ChannelHandler {
 
     /**
      * Gets called after the {@link ChannelHandler} was added to the actual context and it's ready to handle events.
+     * 当其上下文对象添加到管道后，回调这个方法。
      */
     void handlerAdded(ChannelHandlerContext ctx) throws Exception;
 
     /**
      * Gets called after the {@link ChannelHandler} was removed from the actual context and it doesn't handle events
      * anymore.
+     *
+     * 当其上下文对象从管道中删除后，回调这个方法。
      */
     void handlerRemoved(ChannelHandlerContext ctx) throws Exception;
 
