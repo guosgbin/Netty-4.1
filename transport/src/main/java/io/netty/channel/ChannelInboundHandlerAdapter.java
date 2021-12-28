@@ -30,6 +30,12 @@ import io.netty.channel.ChannelHandlerMask.Skip;
  * method returns automatically. If you are looking for a {@link ChannelInboundHandler} implementation that
  * releases the received messages automatically, please see {@link SimpleChannelInboundHandler}.
  * </p>
+ *
+ * ChannelInboundHandler 的抽象基类，提供了所有方法的实现。
+ * 这个实现只是将操作转发到ChannelPipeline的下一个ChannelHandler，子类可以覆盖方法实现来改变这一点。
+ *
+ * 请注意，在channelRead(ChannelHandlerContext, Object)方法自动返回后不会释放消息。
+ * 如果您正在寻找自动释放接收到的消息的ChannelInboundHandler实现，请参阅SimpleChannelInboundHandler
  */
 public class ChannelInboundHandlerAdapter extends ChannelHandlerAdapter implements ChannelInboundHandler {
 
@@ -38,6 +44,9 @@ public class ChannelInboundHandlerAdapter extends ChannelHandlerAdapter implemen
      * to the next {@link ChannelInboundHandler} in the {@link ChannelPipeline}.
      *
      * Sub-classes may override this method to change behavior.
+     *
+     * 调用 ChannelHandlerContext.fireChannelRegistered() 方法
+     * 转发到 ChannelPipeline 中的下一个 ChannelInboundHandler。
      */
     @Skip
     @Override
@@ -48,6 +57,9 @@ public class ChannelInboundHandlerAdapter extends ChannelHandlerAdapter implemen
     /**
      * Calls {@link ChannelHandlerContext#fireChannelUnregistered()} to forward
      * to the next {@link ChannelInboundHandler} in the {@link ChannelPipeline}.
+     *
+     * 调用 ChannelHandlerContext.fireChannelUnregistered() 方法
+     * 来转发到 ChannelPipeline 中的下一个 ChannelInboundHandler。
      *
      * Sub-classes may override this method to change behavior.
      */
@@ -61,6 +73,9 @@ public class ChannelInboundHandlerAdapter extends ChannelHandlerAdapter implemen
      * Calls {@link ChannelHandlerContext#fireChannelActive()} to forward
      * to the next {@link ChannelInboundHandler} in the {@link ChannelPipeline}.
      *
+     * 调用 ChannelHandlerContext.fireChannelActive() 方法
+     * 来转发到 ChannelPipeline 中的下一个 ChannelInboundHandler。
+     *
      * Sub-classes may override this method to change behavior.
      */
     @Skip
@@ -73,6 +88,9 @@ public class ChannelInboundHandlerAdapter extends ChannelHandlerAdapter implemen
      * Calls {@link ChannelHandlerContext#fireChannelInactive()} to forward
      * to the next {@link ChannelInboundHandler} in the {@link ChannelPipeline}.
      *
+     * 调用 ChannelHandlerContext.fireChannelInactive() 方法
+     * 来转发到 ChannelPipeline 中的下一个 ChannelInboundHandler。
+     *
      * Sub-classes may override this method to change behavior.
      */
     @Skip
@@ -84,6 +102,9 @@ public class ChannelInboundHandlerAdapter extends ChannelHandlerAdapter implemen
     /**
      * Calls {@link ChannelHandlerContext#fireChannelRead(Object)} to forward
      * to the next {@link ChannelInboundHandler} in the {@link ChannelPipeline}.
+     *
+     * 调用 ChannelHandlerContext.fireChannelRead(Object) 方法
+     * 来转发到 ChannelPipeline 中的下一个 ChannelInboundHandler。
      *
      * Sub-classes may override this method to change behavior.
      */

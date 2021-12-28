@@ -23,6 +23,8 @@ import java.util.Map;
 
 /**
  * Skeleton implementation of a {@link ChannelHandler}.
+ *
+ * 主要是判断类上是否有 ChannelHandler 的注解 @Shareable
  */
 public abstract class ChannelHandlerAdapter implements ChannelHandler {
 
@@ -31,6 +33,8 @@ public abstract class ChannelHandlerAdapter implements ChannelHandler {
 
     /**
      * Throws {@link IllegalStateException} if {@link ChannelHandlerAdapter#isSharable()} returns {@code true}
+     *
+     * 如果 isSharable() 返回true，抛出 IllegalStateException 异常
      */
     protected void ensureNotSharable() {
         if (isSharable()) {
@@ -41,6 +45,8 @@ public abstract class ChannelHandlerAdapter implements ChannelHandler {
     /**
      * Return {@code true} if the implementation is {@link Sharable} and so can be added
      * to different {@link ChannelPipeline}s.
+     *
+     * 如果返回 true，表示这个 ChannelHandler 被 @Sharable 注解的，也就是说可共享的，可以添加到不同的 ChannelPipeline。
      */
     public boolean isSharable() {
         /**
@@ -52,6 +58,7 @@ public abstract class ChannelHandlerAdapter implements ChannelHandler {
          * See <a href="https://github.com/netty/netty/issues/2289">#2289</a>.
          */
         Class<?> clazz = getClass();
+        // 获取缓存
         Map<Class<?>, Boolean> cache = InternalThreadLocalMap.get().handlerSharableCache();
         Boolean sharable = cache.get(clazz);
         if (sharable == null) {

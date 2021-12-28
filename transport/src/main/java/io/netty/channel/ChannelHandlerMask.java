@@ -32,26 +32,47 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+/**
+ * 处理 @Skip 注解
+ */
 final class ChannelHandlerMask {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ChannelHandlerMask.class);
 
     // Using to mask which methods must be called for a ChannelHandler.
+    // 用来标记 ChannelHandler 中的方法，包括入站事件方法和出站事件方法
+    // 标记 exceptionCaught 方法
     static final int MASK_EXCEPTION_CAUGHT = 1;
+    // 标记 channelRegistered 方法
     static final int MASK_CHANNEL_REGISTERED = 1 << 1;
+    // 标记 channelUnregistered 方法
     static final int MASK_CHANNEL_UNREGISTERED = 1 << 2;
+    // 标记 channelActive 方法
     static final int MASK_CHANNEL_ACTIVE = 1 << 3;
+    // 标记 channelInactive 方法
     static final int MASK_CHANNEL_INACTIVE = 1 << 4;
+    // 标记 channelRead 方法
     static final int MASK_CHANNEL_READ = 1 << 5;
+    // 标记 channelReadComplete 方法
     static final int MASK_CHANNEL_READ_COMPLETE = 1 << 6;
+    // 标记 userEventTriggered 方法
     static final int MASK_USER_EVENT_TRIGGERED = 1 << 7;
+    // 标记 channelWritabilityChanged 方法
     static final int MASK_CHANNEL_WRITABILITY_CHANGED = 1 << 8;
+    // 标记 bind 方法
     static final int MASK_BIND = 1 << 9;
+    // 标记 connect 方法
     static final int MASK_CONNECT = 1 << 10;
+    // 标记 disconnect 方法
     static final int MASK_DISCONNECT = 1 << 11;
+    // 标记 close 方法
     static final int MASK_CLOSE = 1 << 12;
+    // 标记 deregister 方法
     static final int MASK_DEREGISTER = 1 << 13;
+    // 标记 read 方法
     static final int MASK_READ = 1 << 14;
+    // 标记 write 方法
     static final int MASK_WRITE = 1 << 15;
+    // 标记 flush 方法
     static final int MASK_FLUSH = 1 << 16;
 
     // 计算入站事件掩码
@@ -73,6 +94,7 @@ final class ChannelHandlerMask {
     // 0000 0000 0000 0001 1111 1110 0000 0001
     private static final int MASK_ALL_OUTBOUND = MASK_EXCEPTION_CAUGHT | MASK_ONLY_OUTBOUND;
 
+    // 用来缓存， ChannelHandler 子类对应的执行标记 mask，就不用每次都需要计算了
     private static final FastThreadLocal<Map<Class<? extends ChannelHandler>, Integer>> MASKS =
             new FastThreadLocal<Map<Class<? extends ChannelHandler>, Integer>>() {
                 @Override
@@ -178,6 +200,7 @@ final class ChannelHandlerMask {
                 }
             }
 
+            // "exceptionCaught" 方法需要单独判断，因为 ChannelInboundHandler 和 ChannelOutboundHandler 都有它
             if (isSkippable(handlerType, "exceptionCaught", ChannelHandlerContext.class, Throwable.class)) {
                 mask &= ~MASK_EXCEPTION_CAUGHT;
             }

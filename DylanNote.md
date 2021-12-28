@@ -50,8 +50,13 @@ ByteBuf分类，作用
 
 ## Channel
 - Channel 接口
-- ChannelInboundHandler 和 ChannelInboundInvoker
-- ChannelOutboundHandler 和 
+- ChannelInboundHandler 接口和 ChannelInboundInvoker 接口
+- ChannelOutboundHandler 接口和 ChannelOutboundInvoker 接口
+- ChannelHandlerAdapter
+    - ChannelInboundHandlerAdapter
+    - ChannelOutboundHandlerAdapter
+    - ChannelDuplexHandler
+
 
 
 https://www.jianshu.com/p/cf57f20b4cb9

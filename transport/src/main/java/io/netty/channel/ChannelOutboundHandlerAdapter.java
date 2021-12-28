@@ -22,12 +22,17 @@ import java.net.SocketAddress;
 /**
  * Skeleton implementation of a {@link ChannelOutboundHandler}. This implementation just forwards each method call via
  * the {@link ChannelHandlerContext}.
+ *
+ * ChannelOutboundHandler基本实现，只是通过 ChannelHandlerContext 转发每个方法的调用。
  */
 public class ChannelOutboundHandlerAdapter extends ChannelHandlerAdapter implements ChannelOutboundHandler {
 
     /**
      * Calls {@link ChannelHandlerContext#bind(SocketAddress, ChannelPromise)} to forward
      * to the next {@link ChannelOutboundHandler} in the {@link ChannelPipeline}.
+     *
+     * 调用 ChannelHandlerContext.bind(SocketAddress, ChannelPromise) 方法
+     * 以转发到 ChannelPipeline 中的下一个 ChannelOutboundHandler。
      *
      * Sub-classes may override this method to change behavior.
      */

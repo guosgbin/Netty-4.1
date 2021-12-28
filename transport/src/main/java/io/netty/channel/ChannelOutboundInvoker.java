@@ -21,6 +21,18 @@ import io.netty.util.concurrent.FutureListener;
 import java.net.ConnectException;
 import java.net.SocketAddress;
 
+/**
+ * 用来传递出站 IO 操作
+ *
+ * ChannelOutboundInvoker 的子接口管道 ChannelPipeline , 通过ChannelOutboundInvoker 的方法，
+ * 在整个出站处理器ChannelOutboundHandler 链表传递出站I/O操作。
+ *
+ * ChannelOutboundInvoker 的子接口上下文 ChannelHandlerContext ,
+ * 通过ChannelOutboundInvoker 的方法，向 ChannelOutboundHandler 链表上游传递出站I/O操作。
+ *
+ * ChannelOutboundInvoker 的子接口通道 Channel, 它的ChannelOutboundInvoker 方法实现，
+ * 就是直接调用通道 Channel 拥有的管道 ChannelPipeline对应方法。
+ */
 public interface ChannelOutboundInvoker {
 
     /**

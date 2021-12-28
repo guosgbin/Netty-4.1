@@ -20,6 +20,8 @@ import java.net.SocketAddress;
 /**
  * {@link ChannelHandler} which will get notified for IO-outbound-operations.
  *
+ * 用来处理出站 IO 操作
+ *
  * 包括了所有主动的 IO 操作：
  *
  * 绑定操作 bind
