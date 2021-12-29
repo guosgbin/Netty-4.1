@@ -69,6 +69,9 @@ DefaultEventLoopGroup 默认的
   - PendingHandlerAddedTask
   - PendingHandlerRemovedTask
   
+- AbstractChannel 抽象通道
+- ChannelOutboundBuffer 写缓冲区
+  
 
 ## 对象池
 - Recycler
