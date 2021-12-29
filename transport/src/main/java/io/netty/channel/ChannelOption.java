@@ -141,6 +141,10 @@ public class ChannelOption<T> extends AbstractConstant<ChannelOption<T>> {
     public static final ChannelOption<Boolean> DATAGRAM_CHANNEL_ACTIVE_ON_REGISTRATION =
             valueOf("DATAGRAM_CHANNEL_ACTIVE_ON_REGISTRATION");
 
+    // 单线程执行ChannelPipeline中的事件，默认值为True。
+    // 该值控制执行ChannelPipeline中执行ChannelHandler的线程。
+    // 如果为True，整个pipeline由一个线程执行，这样不需要进行线程切换以及线程同步，是Netty4的推荐做法；
+    // 如果为False，ChannelHandler中的处理过程会由Group中的不同线程执行。
     public static final ChannelOption<Boolean> SINGLE_EVENTEXECUTOR_PER_GROUP =
             valueOf("SINGLE_EVENTEXECUTOR_PER_GROUP");
 

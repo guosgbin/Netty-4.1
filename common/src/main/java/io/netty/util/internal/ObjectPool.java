@@ -20,6 +20,8 @@ import io.netty.util.Recycler;
 /**
  * Light-weight object pool.
  *
+ * 轻量级的对象池
+ *
  * @param <T> the type of the pooled object
  */
 public abstract class ObjectPool<T> {
@@ -29,6 +31,8 @@ public abstract class ObjectPool<T> {
     /**
      * Get a {@link Object} from the {@link ObjectPool}. The returned {@link Object} may be created via
      * {@link ObjectCreator#newObject(Handle)} if no pooled {@link Object} is ready to be reused.
+     *
+     * 从对象池中获取一个对象，假如对象池没有创建好对象的话，就会 ObjectCreator#newObject(Handle) 创建新的对象
      */
     public abstract T get();
 
@@ -40,6 +44,8 @@ public abstract class ObjectPool<T> {
     public interface Handle<T> {
         /**
          * Recycle the {@link Object} if possible and so make it ready to be reused.
+         *
+         * 回收对象 使其能够重复利用
          */
         void recycle(T self);
     }
@@ -48,6 +54,8 @@ public abstract class ObjectPool<T> {
      * Creates a new Object which references the given {@link Handle} and calls {@link Handle#recycle(Object)} once
      * it can be re-used.
      *
+     * 创建一个新的对象，这个对象后续可以被 ObjectPool.Handle 的 recycle(Object) 进行回收
+     *
      * @param <T> the type of the pooled object
      */
     public interface ObjectCreator<T> {
@@ -55,6 +63,8 @@ public abstract class ObjectPool<T> {
         /**
          * Creates an returns a new {@link Object} that can be used and later recycled via
          * {@link Handle#recycle(Object)}.
+         *
+         * 创建并返回一个新的对象 ，这个对象可以通过 ObjectPool.Handle.recycle(Object) 方法回收
          */
         T newObject(Handle<T> handle);
     }
@@ -62,6 +72,8 @@ public abstract class ObjectPool<T> {
     /**
      * Creates a new {@link ObjectPool} which will use the given {@link ObjectCreator} to create the {@link Object}
      * that should be pooled.
+     *
+     * 创建一个新的对象池 ，它将使用给定的ObjectPool.ObjectCreator创建新的对象
      */
     public static <T> ObjectPool<T> newPool(final ObjectCreator<T> creator) {
         return new RecyclerObjectPool<T>(ObjectUtil.checkNotNull(creator, "creator"));

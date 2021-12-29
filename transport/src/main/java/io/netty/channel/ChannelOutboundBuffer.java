@@ -131,7 +131,11 @@ public final class ChannelOutboundBuffer {
     private static final AtomicLongFieldUpdater<ChannelOutboundBuffer> TOTAL_PENDING_SIZE_UPDATER =
             AtomicLongFieldUpdater.newUpdater(ChannelOutboundBuffer.class, "totalPendingSize");
 
-    // 出站缓冲区总共有多少字节 注意：包含entry自身字段占用的空间
+    // 出站缓冲区总共有多少字节，表示写缓冲区等待数据大小  注意：包含entry自身字段占用的空间
+    // 当它的值大于 channel.config().getWriteBufferHighWaterMark() 时，表示不能写了，
+    // 通过 setUnwritable(invokeLater) 发送当前通道可写状态改变的 入站IO事件。
+    // 当它的值小于 channel.config().getWriteBufferLowWaterMark() 时，表示又可以写了，
+    // 通过 setWritable(invokeLater) 发送当前通道可写状态改变的 入站IO事件。
     @SuppressWarnings("UnusedDeclaration")
     private volatile long totalPendingSize;
 

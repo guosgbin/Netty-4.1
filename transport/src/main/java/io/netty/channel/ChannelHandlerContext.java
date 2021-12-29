@@ -83,16 +83,28 @@ import io.netty.util.concurrent.EventExecutor;
  * {@link ChannelPipeline} to find out more about inbound and outbound operations,
  * what fundamental differences they have, how they flow in a  pipeline,  and how to handle
  * the operation in your application.
+ *
+ * 使 ChannelHandler 和 ChannelPipeline、其他 Handler 交互，
+ * Handler可以通知 CHannelPipeline 中的下一个 Handler 以及动态修改他所属的 ChannelPipeline
+ *
+ * 1.ChannelHandlerContext 包裹这一个 ChannelHandler, ChannelHandlerContext 必属于一个管道 ChannelPipeline。
+ * 2.ChannelHandlerContext 继承 ChannelInboundInvoker 和 ChannelOutboundInvoker
  */
 public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvoker, ChannelOutboundInvoker {
 
     /**
      * Return the {@link Channel} which is bound to the {@link ChannelHandlerContext}.
+     *
+     * 返回绑定到当前 ChannelHandlerContext 的 Channel
      */
     Channel channel();
 
     /**
      * Returns the {@link EventExecutor} which is used to execute an arbitrary task.
+     *
+     * 返回用于执行该上下文 ChannelHandlerContext 方法的执行器 EventExecutor，
+     * 这个执行器 EventExecutor 可能和 通道Channel的EventExecutor一样，也有可能不一样。
+     * 如果不一样，说明该上下文中方法的处理在另一个线程，不在通道Channel 的IO线程中处理，不会阻塞通道的IO线程。
      */
     EventExecutor executor();
 
@@ -105,6 +117,8 @@ public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvok
 
     /**
      * The {@link ChannelHandler} that is bound this {@link ChannelHandlerContext}.
+     *
+     * 绑定此上下文的ChannelHandler对象。
      */
     ChannelHandler handler();
 
@@ -114,6 +128,8 @@ public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvok
      * {@link EventLoop}.
      */
     boolean isRemoved();
+
+    // ============= 重写来自父接口 ChannelInboundInvoker 的方法 主要是修改方法的返回值 =================== //
 
     @Override
     ChannelHandlerContext fireChannelRegistered();

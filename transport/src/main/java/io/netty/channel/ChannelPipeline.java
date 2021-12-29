@@ -218,6 +218,37 @@ import java.util.NoSuchElementException;
  * A {@link ChannelHandler} can be added or removed at any time because a {@link ChannelPipeline} is thread safe.
  * For example, you can insert an encryption handler when sensitive information is about to be exchanged, and remove it
  * after the exchange.
+ *
+ *
+ * ChannelPipeline 相当于 ChannelHandler 的集合，用于处理或拦截Channel的入站事件和出站操作。
+ * ChannelPipeline实现了拦截过滤器模式的高级形式，让用户完全控制事件的处理方式以及管道中的ChannelHandler如何相互交互。
+ *  对于入站事件是从头到尾地经过 ChannelInboundHandler 列表，由 ChannelInboundHandler 决定是否调用列表中下一个 ChannelInboundHandler。
+ *  对于出站事件是从尾到头地经过 ChannelOutboundHandler 列表，由 ChannelOutboundHandler 决定是否调用列表中上一个 ChannelOutboundHandler。
+ *
+ * (1) 管道的创建
+ * 每个Channel都有自己独有的管道ChannelPipeline，在创建新通道时自动创建。
+ *
+ * (2) 管道内的事件流动
+ * ChannelPipeline将管理的 ChannelHandler 分为两种:
+ *      ChannelInboundHandler 处理入站事件
+ *      入站事件是被动接收事件，例如接收远端数据，通道注册成功，通道变的活跃等等。
+ *      入站事件流向是从 ChannelPipeline 管理的 ChannelInboundHandler 列表头到尾。因为入站事件一般都是从远端发送过来，所以流向是从头到尾。
+ *      采用拦截器的模式，由ChannelInboundHandler 决定是否处理列表中的下一个 ChannelInboundHandler。
+ * ChannelOutboundHandler 处理出站事件
+ *      出站事件是主动触发事件，例如绑定，注册，连接，断开，写入等等。
+ *      出站事件流向是从 ChannelPipeline 管理的 ChannelOutboundHandler 列表尾到头。因为出站事件最后要发送到远端，所以从尾到头。
+ *      采用拦截器的模式，由ChannelInboundHandler 决定是否处理列表中的下一个 ChannelInboundHandler (因为是从尾到头，这里的下一个，在列表中其实是上一个)。
+ *
+ * (3) 有些方法上有 EventExecutorGroup 类型的参数
+ * 我们知道通道 Channel 是注册到一个事件轮询器 EventLoop 中，通道所有的IO 事件都是通过在这个事件轮询器中获取。
+ * 那么默认情况下，通道 Channel 对应的管道 ChannelPipeline 所管理的 ChannelHandler 也都是在这个事件轮询器中处理的。
+ * 这就要求 ChannelHandler不能有太耗时操作，尤其是不能有阻塞操作，这样会导致整个事件轮询器被阻塞，
+ * 会影响注册到这个事件轮询器所有通道的IO 事件处理，以及这个事件轮询器包含的所有待执行任务和计划任务。
+ * 但是我们真的有这个方面的需求怎么办呢? 因此 ChannelPipeline 提供了多一个 EventExecutorGroup 参数的方法，
+ * 它会将添加的这个 ChannelHandler 的所有方法都放在指定的这个事件执行器组EventExecutorGroup中执行，这样就不会阻塞通道 Channel 对应的事件轮询器。
+ *
+ * DefaultEventLoopGroup 仍然保证顺序，所以也会有性能瓶颈
+ * UnorderedThreadPoolEventExecutor 不保证顺序
  */
 public interface ChannelPipeline
         extends ChannelInboundInvoker, ChannelOutboundInvoker, Iterable<Entry<String, ChannelHandler>> {
@@ -599,6 +630,8 @@ public interface ChannelPipeline
      * handler names and whose values are handlers.
      */
     Map<String, ChannelHandler> toMap();
+
+    // -------   重写来自 ChannelInboundInvoker 中的方法  主要是修改方法的返回值 ---------//
 
     @Override
     ChannelPipeline fireChannelRegistered();

@@ -29,6 +29,10 @@ import java.util.Map;
 public abstract class ChannelHandlerAdapter implements ChannelHandler {
 
     // Not using volatile because it's used only for a sanity check.
+    /**
+     * 用来标记 ChannelHandlerAdapter 已经添加到了某个 ChannelPipeline 了
+     * {@link DefaultChannelPipeline#checkMultiplicity(ChannelHandler)}
+     */
     boolean added;
 
     /**

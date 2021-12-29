@@ -48,6 +48,8 @@ ByteBuf分类，作用
 - NioEventLoopGroup
 - NIoEventLoop
 
+DefaultEventLoopGroup 默认的
+
 ## Channel
 - Channel 接口
 - ChannelInboundHandler 接口和 ChannelInboundInvoker 接口
@@ -56,6 +58,22 @@ ByteBuf分类，作用
     - ChannelInboundHandlerAdapter
     - ChannelOutboundHandlerAdapter
     - ChannelDuplexHandler
+- ChannelHandlerMask类
+
+- ChannelPipeline 接口
+- DefaultChannelPipeline
+- ChannelHandlerContext 接口
+  - WriteTask
+  - HeadContext
+  - TailContext
+  - PendingHandlerAddedTask
+  - PendingHandlerRemovedTask
+  
+
+## 对象池
+- Recycler
+- ObjectPool
+
 
 
 
