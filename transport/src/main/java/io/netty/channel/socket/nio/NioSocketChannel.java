@@ -287,11 +287,17 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
         }
     }
 
+    /**
+     * 调用底层NIO 通道的对应方法获取本地绑定地址
+     */
     @Override
     protected SocketAddress localAddress0() {
         return javaChannel().socket().getLocalSocketAddress();
     }
 
+    /**
+     * 调用底层NIO 通道的对应方法获取远程连接地址。
+     */
     @Override
     protected SocketAddress remoteAddress0() {
         return javaChannel().socket().getRemoteSocketAddress();
@@ -303,6 +309,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     }
 
     private void doBind0(SocketAddress localAddress) throws Exception {
+        // 调用底层NIO通道的绑定方法，绑定本地地址
         if (PlatformDependent.javaVersion() >= 7) {
             SocketUtils.bind(javaChannel(), localAddress);
         } else {
@@ -321,6 +328,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     @Override
     protected boolean doConnect(SocketAddress remoteAddress, SocketAddress localAddress) throws Exception {
         if (localAddress != null) {
+            // 先绑定底层NIO通道的本地地址
             doBind0(localAddress);
         }
 
@@ -329,6 +337,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             // 获取JDK层面的SocketChannel，进行连接
             boolean connected = SocketUtils.connect(javaChannel(), remoteAddress);
             if (!connected) {
+                // 没有连接成功，就将 SelectionKey 接收连接事件 OP_CONNECT
                 selectionKey().interestOps(SelectionKey.OP_CONNECT);
             }
             success = true;
@@ -342,6 +351,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
 
     @Override
     protected void doFinishConnect() throws Exception {
+        // 通过底层NIO通道的对应方法实现
         if (!javaChannel().finishConnect()) {
             throw new Error();
         }
@@ -355,11 +365,13 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     @Override
     protected void doClose() throws Exception {
         super.doClose();
+        // 调用底层NIO通道的 close 方法关闭连接
         javaChannel().close();
     }
 
     /**
-     * 从SocketChannel中读取数据
+     * 从SocketChannel中读取数据到 ByteBuf 中，并返回读取数据的大小。
+     * 这个是重写 AbstractNioByteChannel 的方法
      *
      * @param byteBuf
      * @return

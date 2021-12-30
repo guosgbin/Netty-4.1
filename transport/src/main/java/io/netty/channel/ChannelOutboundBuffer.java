@@ -50,6 +50,12 @@ import static java.lang.Math.min;
  * <li>{@link #getUserDefinedWritability(int)} and {@link #setUserDefinedWritability(int, boolean)}</li>
  * </ul>
  * </p>
+ *
+ *
+ * flushedEntry 表示第一个被刷新的节点，在链表头，当然也是通过 addFlush() 方法设置的。
+ * unflushedEntry 表示第一个未刷新的节点，表示还没有被标记刷新的第一个节点。
+ * tailEntry 最后一个节点。
+ * flushed 刷新节点的数量，这个属性很重要，靠它来标记刷新节点，也就是说从 flushedEntry 开始， flushed 数量的节点都被标记为刷新节点了。
  */
 public final class ChannelOutboundBuffer {
     // Assuming a 64-bit JVM:
@@ -162,16 +168,19 @@ public final class ChannelOutboundBuffer {
      * @param promise
      */
     public void addMessage(Object msg, int size, ChannelPromise promise) {
-        // 获取一个Entry对象
+        // 将提供的消息封装为一个 Entry 对象
         Entry entry = Entry.newInstance(msg, size, total(msg), promise);
         if (tailEntry == null) {
             flushedEntry = null;
         } else {
+            // 将新消息节点添加到队列尾
             Entry tail = tailEntry;
             tail.next = entry;
         }
         tailEntry = entry;
         if (unflushedEntry == null) {
+            // 如果未刷新节点为空，说明队列节点都变成刷新节点了，
+            // 那么这个新添加的节点，就是未刷新节点的头了。
             unflushedEntry = entry;
         }
 
@@ -184,12 +193,16 @@ public final class ChannelOutboundBuffer {
     /**
      * Add a flush to this {@link ChannelOutboundBuffer}. This means all previous added messages are marked as flushed
      * and so you will be able to handle them.
+     *
+     * 向此ChannelOutboundBuffer添加刷新。
+     * 这意味着之前添加的所有消息都标记为已刷新，因此您将能够处理它们。
      */
     public void addFlush() {
         // There is no need to process all entries if there was already a flush before and no new messages
         // where added in the meantime.
         //
         // See https://github.com/netty/netty/issues/2577
+        // 未刷新节点后面的链表示新添加的节点列表，都是要加入到刷新中
         Entry entry = unflushedEntry;
         if (entry != null) {
             if (flushedEntry == null) {
@@ -198,9 +211,11 @@ public final class ChannelOutboundBuffer {
             }
             do {
                 flushed ++;
+                // 将所有要刷新的节点变成不可取消的
                 if (!entry.promise.setUncancellable()) {
                     // Was cancelled so make sure we free up memory and notify about the freed bytes
                     int pending = entry.cancel();
+                    // 挂起消息被取消，所以确保我们释放内存并通知释放的字节
                     decrementPendingOutboundBytes(pending, false, true);
                 }
                 entry = entry.next;
@@ -306,6 +321,9 @@ public final class ChannelOutboundBuffer {
      * Will remove the current message, mark its {@link ChannelPromise} as success and return {@code true}. If no
      * flushed message exists at the time this method is called it will return {@code false} to signal that no more
      * messages are ready to be handled.
+     *
+     * 将删除当前消息，将其ChannelPromise标记为success并返回true。
+     * 如果在调用此方法时不存在刷新的消息，则返回false，表示没有准备好处理的消息。
      */
     public boolean remove() {
         Entry e = flushedEntry;

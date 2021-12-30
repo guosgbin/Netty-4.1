@@ -71,7 +71,12 @@ DefaultEventLoopGroup 默认的
   
 - AbstractChannel 抽象通道
 - ChannelOutboundBuffer 写缓冲区
-  
+- AbstractNioChannel
+  - AbstractNioByteChannel
+  - AbstractNioMessageChannel
+
+- NioSocketChannel
+- NioServerSocketChannel
 
 ## 对象池
 - Recycler

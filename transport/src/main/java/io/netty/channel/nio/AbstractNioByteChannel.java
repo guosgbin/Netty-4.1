@@ -138,6 +138,12 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             }
         }
 
+        /**
+         * 1 通过 doReadBytes(byteBuf) 方法,从底层NIO 通道中读取数据到输入缓冲区ByteBuf 中。
+         * 2 通过 pipeline.fireChannelRead(...) 方法，发送ChannelRead读取事件。
+         * 3 通过 allocHandle.continueReading() 判断是否需要继续读取。
+         * 4 这次读取完成，调用 pipeline.fireChannelReadComplete() 方法，发送 ChannelReadComplete 读取完成事件。
+         */
         @Override
         public final void read() {
             // 获取客户端的配置Config对象
@@ -233,16 +239,31 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         return doWriteInternal(in, in.current());
     }
 
+    /**
+     * 写缓冲区 ChannelOutboundBuffer 中的数据分为两类: ByteBuf 和 FileRegion。
+     * 调用各自的 doWriteBytes(buf) 和 doWriteFileRegion(region) 方法进行写入数据。这两个方法再上面就有实现。
+     * 通过 in.remove() 方法，从写缓冲区ChannelOutboundBuffer中移除当前刷新节点，将下一个节点变成当前节点。
+     *
+     * @param in
+     * @param msg
+     * @return
+     * @throws Exception
+     */
     private int doWriteInternal(ChannelOutboundBuffer in, Object msg) throws Exception {
         if (msg instanceof ByteBuf) {
             ByteBuf buf = (ByteBuf) msg;
             if (!buf.isReadable()) {
+                // 没有数据写入，
+                // 从写缓冲区ChannelOutboundBuffer中移除当前刷新节点，
+                // 获取下一个刷新节点
                 in.remove();
                 return 0;
             }
 
+            // 将缓存区ByteBuf中的数据写入到底层的NIO通道，返回写入的字节数
             final int localFlushedAmount = doWriteBytes(buf);
             if (localFlushedAmount > 0) {
+                // 更新写入的进度
                 in.progress(localFlushedAmount);
                 if (!buf.isReadable()) {
                     in.remove();
@@ -271,6 +292,19 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         return WRITE_STATUS_SNDBUF_FULL;
     }
 
+    /**
+     * 1 先得到 writeSpinCount，表示一次写操作，最多能有多少次写操作
+     * 是为了防止写缓冲区 ChannelOutboundBuffer 中要写入的数据对象太多了，doWrite(...) 方法执行时间太长，
+     * 最多只能写 writeSpinCount 个对象数据，然后通过 incompleteWrite(...) 方法除非下次写循环继续。
+     *
+     * 2 在循环中通过调用 doWriteInternal(...) 方法进行发送数据。
+     * 如果所有消息发送成功了，就清除Write的标记
+     *
+     * 3 如果写缓冲区数据没有写完，那么调用 incompleteWrite(...) 方法，准备下次写入。
+     *
+     * @param in
+     * @throws Exception
+     */
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         // 写请求自循环次数，默认16次

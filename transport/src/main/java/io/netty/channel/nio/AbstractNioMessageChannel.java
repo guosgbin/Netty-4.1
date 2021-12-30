@@ -63,6 +63,13 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
 
         private final List<Object> readBuf = new ArrayList<Object>();
 
+        /**
+         * 1 使用 readBuf 数组，一次读取操作所有的数据对象。
+         * 2 通过 doReadMessages(readBuf) 方法，将消息读入给定数组 readBuf，并返回所读入的数量localRead。
+         * 3 通过 localRead 的值，判断是否读取完成，或者通道已经关闭。
+         * 4 通过 continueReading(allocHandle) 方法，判断是否需要继续读取。
+         * 5 遍历读取消息的数组readBuf, 通过管道 pipeline 发送 ChannelRead 读取事件；遍历完成，通过管道 pipeline 发送 ChannelReadComplete 读取完成事件。
+         */
         @Override
         public void read() {
             assert eventLoop().inEventLoop();
@@ -79,6 +86,7 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                 try {
                     // 读消息循环
                     do {
+                        // 将消息读入给定数组并返回所读入的数量
                         // 正常情况返回1
                         int localRead = doReadMessages(readBuf);
                         if (localRead == 0) {
@@ -106,6 +114,7 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                 }
                 // 清空
                 readBuf.clear();
+                // 这次读取已完成
                 allocHandle.readComplete();
                 // 重新设置Selector上当前Server key，让key包含Accept，就是让Selector继续帮Server监听accept事件
                 pipeline.fireChannelReadComplete();

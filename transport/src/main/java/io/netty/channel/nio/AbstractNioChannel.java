@@ -199,19 +199,33 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     public interface NioUnsafe extends Unsafe {
         /**
          * Return underlying {@link SelectableChannel}
+         *
+         * 返回底层的NIO通道
          */
         SelectableChannel ch();
 
         /**
          * Finish connect
+         * 结束连接
+         * 在 NioEventLoop 的 processSelectedKey 方法中调用，
+         * 当底层的NIO通道接收到连接事件 OP_CONNECT 时调用
          */
         void finishConnect();
 
         /**
          * Read from underlying {@link SelectableChannel}
+         *
+         * NIO的 SelectableChannel通道中获取到远端的数据
+         * 在 NioEventLoop 的 processSelectedKey 方法中调用，
+         * 当底层的NIO通道接收到读取事件 OP_READ 时调用。
          */
         void read();
 
+        /**
+         * 强制刷新；
+         * 在 NioEventLoop 的 processSelectedKey 方法中调用，
+         * 当底层的NIO通道接收到可写事件 OP_WRITE 时调用。
+         */
         void forceFlush();
     }
 
@@ -246,6 +260,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             }
 
             try {
+                // 当 connectPromise 不为空，说明已经有人尝试连接了
                 // 确保没有正在进行的连接
                 if (connectPromise != null) {
                     // Already a connect in process.
@@ -253,7 +268,9 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                 }
 
                 boolean wasActive = isActive();
+                // 调用 AbstractNioChannel 的 doConnect 方法进行连接
                 if (doConnect(remoteAddress, localAddress)) {
+                    // 完成 ChannelPromise 的通知，以及是否发送 ChannelActive 事件和 ChannelInactive 事件。
                     fulfillConnectPromise(promise, wasActive);
                 } else {
                     connectPromise = promise;
@@ -262,6 +279,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                     // Schedule connect timeout.
                     int connectTimeoutMillis = config().getConnectTimeoutMillis();
                     if (connectTimeoutMillis > 0) {
+                        // 设置一个超时任务，规定时间内，它没有被取消，就会 close(voidPromise()) 关闭通道
+                        // 在 finishConnect() 和 doClose() 方法中，会取消这个超时任务
                         connectTimeoutFuture = eventLoop().schedule(new Runnable() {
                             @Override
                             public void run() {
@@ -269,6 +288,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                                 if (connectPromise != null && !connectPromise.isDone()
                                         && connectPromise.tryFailure(new ConnectTimeoutException(
                                                 "connection timed out: " + remoteAddress))) {
+                                    // 连接超时，关闭通道
                                     close(voidPromise());
                                 }
                             }
@@ -278,6 +298,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                     promise.addListener(new ChannelFutureListener() {
                         @Override
                         public void operationComplete(ChannelFuture future) throws Exception {
+                            // 用户主动取消这次连接请求， 要取消连接超时任务，以及关闭通道
                             if (future.isCancelled()) {
                                 if (connectTimeoutFuture != null) {
                                     connectTimeoutFuture.cancel(false);
@@ -314,6 +335,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             }
 
             // If a user cancelled the connection attempt, close the channel, which is followed by channelInactive().
+            // 如果用户取消了这次连接请求，
+            // 则关闭通道，然后可能会发送 ChannelInactive 事件
             if (!promiseSet) {
                 close(voidPromise());
             }
@@ -339,7 +362,9 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
             try {
                 boolean wasActive = isActive();
+                // 调用 AbstractNioChannel 的 doFinishConnect 方法进行完成连接操作
                 doFinishConnect();
+                // 完成 ChannelPromise 的通知，以及是否发送 ChannelActive 事件和 ChannelInactive 事件。
                 fulfillConnectPromise(connectPromise, wasActive);
             } catch (Throwable t) {
                 fulfillConnectPromise(connectPromise, annotateConnectException(t, requestedRemoteAddress));
@@ -347,6 +372,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                 // Check for null as the connectTimeoutFuture is only created if a connectTimeoutMillis > 0 is used
                 // See https://github.com/netty/netty/issues/1770
                 if (connectTimeoutFuture != null) {
+                    // 连接已经完成，就需要取消连接超时任务。
                     connectTimeoutFuture.cancel(false);
                 }
                 connectPromise = null;
@@ -429,9 +455,11 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             return;
         }
 
+        // 设置当前通道是 可读状态
         readPending = true;
 
         final int interestOps = selectionKey.interestOps();
+        // 设置底层NIO通道读事件 OP_READ 或 OP_ACCEPT
         if ((interestOps & readInterestOp) == 0) {
             selectionKey.interestOps(interestOps | readInterestOp);
         }
@@ -522,6 +550,11 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         return buf;
     }
 
+    /**
+     * 一般来说子类都要重写这个方法
+     *
+     * @throws Exception
+     */
     @Override
     protected void doClose() throws Exception {
         ChannelPromise promise = connectPromise;
@@ -531,6 +564,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             connectPromise = null;
         }
 
+        // 关闭操作时，需要取消连接超时任务
         Future<?> future = connectTimeoutFuture;
         if (future != null) {
             future.cancel(false);
