@@ -26,7 +26,7 @@
   <groupId>io.netty</groupId>
   <artifactId>netty-parent</artifactId>
   <packaging>pom</packaging>
-  <version>4.1.69.Final-SNAPSHOT</version>
+  <version>1.0.1-DYLAN-SNAPSHOT</version>
 
   <name>Netty</name>
   <url>https://netty.io/</url>
@@ -564,15 +564,15 @@
     <module>handler</module>
     <module>handler-proxy</module>
     <module>example</module>
-    <module>testsuite</module>
-    <module>testsuite-autobahn</module>
-    <module>testsuite-http2</module>
-    <module>testsuite-osgi</module>
-    <module>testsuite-shading</module>
-    <module>testsuite-native</module>
-    <module>testsuite-native-image</module>
-    <module>testsuite-native-image-client</module>
-    <module>testsuite-native-image-client-runtime-init</module>
+<!--    <module>testsuite</module>-->
+<!--    <module>testsuite-autobahn</module>-->
+<!--    <module>testsuite-http2</module>-->
+<!--    <module>testsuite-osgi</module>-->
+<!--    <module>testsuite-shading</module>-->
+<!--    <module>testsuite-native</module>-->
+<!--    <module>testsuite-native-image</module>-->
+<!--    <module>testsuite-native-image-client</module>-->
+<!--    <module>testsuite-native-image-client-runtime-init</module>-->
     <module>transport-blockhound-tests</module>
     <module>microbench</module>
     <module>bom</module>
@@ -1011,39 +1011,40 @@
     </extensions>
 
     <plugins>
-      <plugin>
-        <groupId>com.github.siom79.japicmp</groupId>
-        <artifactId>japicmp-maven-plugin</artifactId>
-        <version>0.15.3</version>
-        <configuration>
-          <parameter>
-            <ignoreMissingOldVersion>true</ignoreMissingOldVersion>
-            <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
-            <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
-            <oldVersionPattern>\d+\.\d+\.\d+\.Final</oldVersionPattern>
-            <ignoreMissingClassesByRegularExpressions>
-              <!-- ignore everything which is not part of netty itself as the plugin can not handle optional dependencies -->
-              <ignoreMissingClassesByRegularExpression>^(?!io\.netty\.).*</ignoreMissingClassesByRegularExpression>
-              <ignoreMissingClassesByRegularExpression>^io\.netty\.internal\.tcnative\..*</ignoreMissingClassesByRegularExpression>
-            </ignoreMissingClassesByRegularExpressions>
-            <excludes>
-              <exclude>@io.netty.util.internal.UnstableApi</exclude>
-              <exclude>io.netty.util.internal.shaded</exclude>
-              <!-- Added to fix false-positive -->
-              <exclude>io.netty.handler.codec.dns.TcpDnsQueryDecoder</exclude>
-              <exclude>io.netty.handler.codec.dns.TcpDnsResponseEncoder</exclude>
-            </excludes>
-          </parameter>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>verify</phase>
-            <goals>
-              <goal>cmp</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
+      <!-- 版本比较的 -->
+<!--      <plugin>-->
+<!--        <groupId>com.github.siom79.japicmp</groupId>-->
+<!--        <artifactId>japicmp-maven-plugin</artifactId>-->
+<!--        <version>0.15.3</version>-->
+<!--        <configuration>-->
+<!--          <parameter>-->
+<!--            <ignoreMissingOldVersion>true</ignoreMissingOldVersion>-->
+<!--            <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>-->
+<!--            <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>-->
+<!--            <oldVersionPattern>\d+\.\d+\.\d+\.Final</oldVersionPattern>-->
+<!--            <ignoreMissingClassesByRegularExpressions>-->
+<!--              &lt;!&ndash; ignore everything which is not part of netty itself as the plugin can not handle optional dependencies &ndash;&gt;-->
+<!--              <ignoreMissingClassesByRegularExpression>^(?!io\.netty\.).*</ignoreMissingClassesByRegularExpression>-->
+<!--              <ignoreMissingClassesByRegularExpression>^io\.netty\.internal\.tcnative\..*</ignoreMissingClassesByRegularExpression>-->
+<!--            </ignoreMissingClassesByRegularExpressions>-->
+<!--            <excludes>-->
+<!--              <exclude>@io.netty.util.internal.UnstableApi</exclude>-->
+<!--              <exclude>io.netty.util.internal.shaded</exclude>-->
+<!--              &lt;!&ndash; Added to fix false-positive &ndash;&gt;-->
+<!--              <exclude>io.netty.handler.codec.dns.TcpDnsQueryDecoder</exclude>-->
+<!--              <exclude>io.netty.handler.codec.dns.TcpDnsResponseEncoder</exclude>-->
+<!--            </excludes>-->
+<!--          </parameter>-->
+<!--        </configuration>-->
+<!--        <executions>-->
+<!--          <execution>-->
+<!--            <phase>verify</phase>-->
+<!--            <goals>-->
+<!--              <goal>cmp</goal>-->
+<!--            </goals>-->
+<!--          </execution>-->
+<!--        </executions>-->
+<!--      </plugin>-->
       <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
         <version>${enforcer.plugin.version}</version>
