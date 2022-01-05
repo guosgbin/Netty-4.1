@@ -82,6 +82,11 @@ DefaultEventLoopGroup 默认的
 - Recycler
 - ObjectPool
 
+## 编解码器
+
+将字节解码为消息 - ByteToMessageDecoder 和 ReplayingDecoder（ReplayingDecoderByteBuf）
+
+将一种消息类型解码为另一种 - MessageToMessageDecoder
 
 
 
