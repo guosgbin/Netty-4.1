@@ -71,6 +71,18 @@ import static java.lang.Integer.MAX_VALUE;
  * Some methods such as {@link ByteBuf#readBytes(int)} will cause a memory leak if the returned buffer
  * is not released or added to the <tt>out</tt> {@link List}. Use derived buffers like {@link ByteBuf#readSlice(int)}
  * to avoid leaking memory.
+ *
+ *
+ * DelimiterBasedFrameDecoder 分隔符
+ * FixedLengthFrameDecoder 固定长度
+ * LengthFieldBasedFrameDecoder
+ * LineBasedFrameDecoder 行位
+ *
+ * 如果需要自定义帧解码器，那么在使用 {@link ByteToMessageDecoder} 实现解码器时需要小心。
+ * 通过检查 {@link ByteBuf#readableBytes()}，确保缓冲区中有足够的字节用于完整的帧。
+ * 如果没有足够的字节用于完整的帧，则在不修改读取器索引的情况下返回以允许更多字节到达
+ *
+ * ByteToMessageDecoder 的子类不能被 @Sharable 注解修饰
  */
 public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter {
 
@@ -487,6 +499,10 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      * @param in            the {@link ByteBuf} from which to read data
      * @param out           the {@link List} to which decoded messages should be added
      * @throws Exception    is thrown if an error occurs
+     *
+     * in 传入数据， out 是用来添加解码消息的 List。
+     * 这个方法的调用将会重复进行，直到确定没有新的元素被添加到该 List，或者该 ByteBuf 中没有更多的可读取的字节时为止。
+     * 然后，如果该 List 不为空，那么它的内容将会被传递给 ChannelPipeline 中的下一个 ChannelInboundHandler。
      */
     protected abstract void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception;
 
@@ -522,6 +538,9 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      *
      * By default this will just call {@link #decode(ChannelHandlerContext, ByteBuf, List)} but sub-classes may
      * override this for some special cleanup operation.
+     *
+     * 当 Channel 的状态变为非活动时，这个方法将会被调用一次，
+     * 默认实现只是简单地调用了decode()方法，当然子类可以重写该方法。
      */
     protected void decodeLast(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
         if (in.isReadable()) {

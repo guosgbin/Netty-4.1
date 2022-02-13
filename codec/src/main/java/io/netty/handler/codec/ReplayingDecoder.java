@@ -264,6 +264,14 @@ import java.util.List;
  * @param <S>
  *        the state type which is usually an {@link Enum}; use {@link Void} if state management is
  *        unused
+ *
+ *
+ *  特点是解码时，不用去判断字节数是否足够一个消息
+ *  如果没有足够的字节可以用，里面的方法会抛出一个 Error，将在基类中被捕获并处理。
+ *  当有更多的数据可以读取时，这个 decode() 方法将会再次被调用
+ *
+ *  如果网络速度较慢且消息格式与上述示例不同，则性能可能会更差
+ *  ReplayingDecoder 稍慢于 ByteToMessageDecoder。
  */
 public abstract class ReplayingDecoder<S> extends ByteToMessageDecoder {
 
