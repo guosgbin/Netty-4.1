@@ -72,6 +72,10 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
         return contains(node, node.priorityQueueIndex(this));
     }
 
+    /**
+     * 清空优先队列中的元素
+     * 假如数组中的元素存在，将节点的索引状态设置为-1，表示节点不在队列中了
+     */
     @Override
     public void clear() {
         // 遍历队列中的元素节点
@@ -97,8 +101,12 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
         size = 0;
     }
 
+    /**
+     * 添加元素到优先队列
+     */
     @Override
     public boolean offer(T e) {
+        // 根据索引判断，当前待添加的元素是否在队列中
         if (e.priorityQueueIndex(this) != INDEX_NOT_IN_QUEUE) {
             throw new IllegalArgumentException("e.priorityQueueIndex(): " + e.priorityQueueIndex(this) +
                     " (expected: " + INDEX_NOT_IN_QUEUE + ") + e: " + e);
@@ -296,6 +304,10 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
     /**
      * 调用这个方法，表示当前 k 位置的节点值 node 可能比它的子节点的值大；
      * 为了保持最小堆属性，因此向下遍历树，将节点值 node 放到合适的位置
+     *
+     *     0
+     *   1   2
+     *  3 4 5
      */
     private void bubbleDown(int k, T node) {
         // size 是树的最底一层， size >>> 1 就表示最底一层节点的父节点
@@ -345,6 +357,9 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
     /**
      * 调用这个方法，表示当前 k 位置的节点值 node 可能比它的父节点的值小；
      * 为了保持最小堆属性，因此向上遍历树，将节点值 node 放到合适的位置
+     *     0
+     *   1   2
+     *  3 4 5
      */
     private void bubbleUp(int k, T node) {
         // 当k==0时，就到了堆二叉树的根节点了，跳出循环
@@ -356,14 +371,15 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
 
             // If the bubbleUp node is less than the parent, then we have found a spot to insert and still maintain
             // min-heap properties.
-            // 如果 bubbleUp节点node 大于等于父节点，那么我们找到了一个插入点，并且仍然保持最小堆属性。
             if (comparator.compare(node, parent) >= 0) {
+                // 待添加的元素比父节点大(或等于)，说明已经找到要插入的位置了，直接跳出循环
                 break;
             }
 
             // Bubble the parent down.
-            // 否则就将父节点元素存放到k位置
+            // 前置条件待添加的元素比父节点小，就将父节点元素存放到k位置
             queue[k] = parent;
+            // 设置父节点的姓索引为k
             parent.priorityQueueIndex(this, k);
 
             // Move k up the tree for the next iteration.

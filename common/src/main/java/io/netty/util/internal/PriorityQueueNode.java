@@ -29,7 +29,7 @@ public interface PriorityQueueNode {
     /**
      * This should be used to initialize the storage returned by {@link #priorityQueueIndex(DefaultPriorityQueue)}.
      *
-     * 表示节点不在队列中
+     * -1 表示节点不在队列中
      */
     int INDEX_NOT_IN_QUEUE = -1;
 
@@ -39,7 +39,7 @@ public interface PriorityQueueNode {
      * <p>
      * Throwing exceptions from this method will result in undefined behavior.
      *
-     * 获取由 priorityQueueIndex(DefaultPriorityQueue, int) 为queue对应的值设置的最后一个值。
+     * 返回当前节点在优先队列中的索引
      */
     int priorityQueueIndex(DefaultPriorityQueue<?> queue);
 
@@ -48,7 +48,7 @@ public interface PriorityQueueNode {
      * <p>
      * Throwing exceptions from this method will result in undefined behavior.
      *
-     * 由 DefaultPriorityQueue 用于维护队列中元素的状态。
+     * 设置当前节点在优先队列中的索引
      *
      * @param queue The queue for which the index is being set.
      * @param i The index as used by {@link DefaultPriorityQueue}.

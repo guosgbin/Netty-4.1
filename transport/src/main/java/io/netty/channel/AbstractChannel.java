@@ -772,6 +772,19 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             pipeline.fireUserEventTriggered(ChannelOutputShutdownEvent.INSTANCE);
         }
 
+        /**
+         * 1 将发送队列情况，不再允许发送新的消息
+         * 2 调用 NioSocketChannel 的 doClose 方法，关闭 Channel
+         * 3 判断当前 Channel 是否有消息正在发送，如果有的话就将 SelectionKey 的去注册操作封装成 Task 放到 EventLoop 中稍后执行
+         * 4 触发 inActive 事件
+         * 5 触发 Unregistered 事件,从 Selector 上取消 selectionKey
+         * 6 调用 ChannelOutBoundBuffer 的 close 方法，释放发送队列中所有尚未完成发送的 ByteBuf (关闭之前没有被flushed 的message),等待GC
+         *
+         * @param promise
+         * @param cause
+         * @param closeCause
+         * @param notify
+         */
         private void close(final ChannelPromise promise, final Throwable cause,
                            final ClosedChannelException closeCause, final boolean notify) {
             if (!promise.setUncancellable()) {

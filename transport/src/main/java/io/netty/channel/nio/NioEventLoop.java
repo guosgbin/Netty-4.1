@@ -908,6 +908,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+    /**
+     * 把原本注册再 selector 上的所有 Channel 都关闭
+     */
     private void closeAll() {
         selectAgain();
         Set<SelectionKey> keys = selector.keys();

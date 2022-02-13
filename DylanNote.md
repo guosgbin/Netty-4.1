@@ -1,13 +1,23 @@
 # Netty 整体笔记架构
-## 讲解ByteBuf源码分析
+## 讲解ByteBuf源码分析 TODO
 ByteBuf分类，作用
 
 - ByteBuf接口
 
 
-## Future和Promise源码分析
+## Future和Promise源码分析 TODO
 
-## EventExecutor和EventLoop接口分析
+## NioEventLoopGroup的体系 OK
+前提条件 讲一下 线程工厂类 和 EventLoop 选择器类
+
+1. 首先放一张继承体系图，分别讲解各个父类的作用
+2. 讲解NioEventLoopGroup的初始化操作
+
+## NIoEventLoop的体系
+
+
+
+## EventExecutor和EventLoop接口分析 OK
 
 这几个都是JDK的接口
 - Executor 接口

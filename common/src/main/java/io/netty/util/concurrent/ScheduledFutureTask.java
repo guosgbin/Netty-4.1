@@ -194,6 +194,7 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
         }
 
         ScheduledFutureTask<?> that = (ScheduledFutureTask<?>) o;
+        // 计算两个任务的执行截止时间的大小
         long d = deadlineNanos() - that.deadlineNanos();
         if (d < 0) {
             return -1;
