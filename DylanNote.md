@@ -17,7 +17,7 @@ ByteBuf分类，作用
 
 
 
-## EventExecutor和EventLoop接口分析 OK
+## EventExecutor和EventLoop接口分析
 
 这几个都是JDK的接口
 - Executor 接口
@@ -25,22 +25,22 @@ ByteBuf分类，作用
 - ScheduledExecutorService 接口
 
 接下来是 Netty 的接口
-- EventExecutorGroup 接口
-- EventExecutor 接口
-- EventLoopGroup 接口
-- EventLoop 接口
+- EventExecutorGroup 接口 OK
+- EventExecutor 接口 OK
+- EventLoopGroup 接口 OK
+- EventLoop 接口 OK
    
 ## EventExecutor和EventLoop的抽象基类 
-- AbstractEventExecutor
-    - AbstractScheduledEventExecutor
+- AbstractEventExecutor OK
+    - AbstractScheduledEventExecutor OK
   
 定时器相关
 
-- PriorityQueue 接口
-- PriorityQueueNode 接口
-- ScheduledFutureTask
-- DefaultPriorityQueue 优先队列
-- AbstractScheduledEventExecutor 抽象类
+- PriorityQueue 接口 OK
+- PriorityQueueNode 接口 OK
+- ScheduledFutureTask OK
+- DefaultPriorityQueue 优先队列 OK
+- AbstractScheduledEventExecutor 抽象类 OK
 
 ===========
 

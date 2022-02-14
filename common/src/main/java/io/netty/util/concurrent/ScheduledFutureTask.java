@@ -210,6 +210,11 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
 
     /**
      * 运行任务
+     *
+     * periodNanos == 0，执行任务然后退出；
+     * periodNanos > 0代表每periodNanos时间执行一次，不考虑任务的耗时，所以下次任务的执行时间为deadlineNanos += p；
+     * periodNanos < 0代表每periodNanos时间执行一次，每次以当此任务结束时间为开始计时，所以下次任务的执行时间为deadlineNanos = nanoTime() - p;
+     * 计算完下次任务的开始执行时间后，就将其重新加入队列，scheduledTaskQueue.add(this);
      */
     @Override
     public void run() {
