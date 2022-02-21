@@ -116,7 +116,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     @SuppressWarnings({ "FieldMayBeFinal", "unused" })
     private volatile int state = ST_NOT_STARTED;
 
+    // 优雅关闭的静默期
     private volatile long gracefulShutdownQuietPeriod;
+    // 优雅关闭的超时时间
     private volatile long gracefulShutdownTimeout;
     // 开始shutdown操作的时间
     private long gracefulShutdownStartTime;
@@ -238,7 +240,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     /**
      * 不阻塞获取任务
-     * 检索并删除任务队列的头部，如果该任务队列为空则返回 null。
+     * 获取并移除队首任务，如果该任务队列为空则返回 null。
      *
      * @see Queue#poll()
      */
@@ -311,12 +313,6 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                     // 从待执行任务队列获取任务，
                     // 如果队列为空，那么线程将被阻塞
                     // 直到有任务添加，或者有人中断线程
-                    // 可能有人有疑惑，如果在 taskQueue.take() 等待期间，
-                    // 有人添加了计划任务，那怎么办？
-                    // 其实这个时候添加计划任务，会先将计划任务ScheduledFutureTask当成一个任务，
-                    // 添加到待执行任务队列中，这里就直接被唤醒了。
-                    // 在 ScheduledFutureTask 的`run` 方法中，会判断如果截止时间没有到，
-                    // 再把自己添加到计划任务队列中，而这时它一定是在执行器线程。
                     task = taskQueue.take();
                     // 如果是唤醒任务，直接返回 null
                     if (task == WAKEUP_TASK) {
@@ -347,11 +343,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                     // scheduled tasks are never executed if there is always one task in the taskQueue.
                     // This is for example true for the read task of OIO Transport
                     // See https://github.com/netty/netty/issues/1614
-                    // 将scheduled任务队列中当前过期的计划任务添加到 待执行任务队列 taskQueue
+                    // 将scheduled任务队列中当前过期的Scheduled任务添加到 待执行任务队列 taskQueue
                     // 注意如果taskQueue中总是有一个任务，计划任务可能永远不会执行。
                     fetchFromScheduledTaskQueue();
                     // 因为已经将时间到了的scheduled任务加入到任务队列 taskQueue 中，
-                    // 这里重新获取任务， poll 方法不会阻塞线程
+                    // 这里重新获取任务，不会阻塞线程
                     task = taskQueue.poll();
                 }
 
@@ -363,7 +359,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     /**
-     * 将 Scheduled 任务队列中当前过期的计划任务添加到 待执行任务队列 taskQueue
+     * 将 Scheduled 任务队列中当前过期的任务添加到 待执行任务队列 taskQueue
      */
     private boolean fetchFromScheduledTaskQueue() {
         // 计划任务队列为空，直接返回
@@ -767,6 +763,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     public Future<?> shutdownGracefully(long quietPeriod, long timeout, TimeUnit unit) {
         ObjectUtil.checkPositiveOrZero(quietPeriod, "quietPeriod");
         if (timeout < quietPeriod) {
+            // 假如执行器的关闭的超时时间timeout小于静默期时间quietPeriod，则报错
             throw new IllegalArgumentException(
                     "timeout: " + timeout + " (expected >= quietPeriod (" + quietPeriod + "))");
         }
@@ -790,8 +787,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             oldState = state;
             if (inEventLoop) {
                 // 如果当前线程是执行器线程，新的执行器状态 newState 就是 ST_SHUTTING_DOWN
+                // 这是因为当前线程是 eventLoop 线程，状态改变只会在 eventLoop 线程改变，所以这里可以直接赋值
                 newState = ST_SHUTTING_DOWN;
             } else {
+                // 当前线程不是执行器线程，需要分情况判断
+                // 因为在某个时刻 eventLoop 线程可能会改变执行器的状态
                 switch (oldState) {
                     case ST_NOT_STARTED:
                     case ST_STARTED:
@@ -813,6 +813,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         gracefulShutdownQuietPeriod = unit.toNanos(quietPeriod);
         gracefulShutdownTimeout = unit.toNanos(timeout);
 
+        // 确保线程正常启动
         if (ensureThreadStarted(oldState)) {
             return terminationFuture;
         }
@@ -958,6 +959,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
         // 当前时间减去最近一次任务执行时间，还小于优雅关闭安静期时间 gracefulShutdownQuietPeriod
         // 就还可以将这段时间添加的任务运行
+        // 在静默期间每100ms唤醒线程执行期间提交的任务
         if (nanoTime - lastExecutionTime <= gracefulShutdownQuietPeriod) {
             // Check if any tasks were added to the queue every 100ms.
             // TODO: Change the behavior of takeTask() so that it returns on timeout.
@@ -976,7 +978,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
         // No tasks were added for last quiet period - hopefully safe to shut down.
         // (Hopefully because we really cannot make a guarantee that there will be no execute() calls by a user.)
-        // 在最后一段安静期间没有添加任何任务-希望可以安全关闭。
+        // 静默时间内没有任务提交，可以优雅关闭，此时若用户又提交任务则不会被执行
         return true;
     }
 
@@ -1014,7 +1016,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         boolean inEventLoop = inEventLoop();
         // 将任务添加到待执行任务队列taskQueue中
         // 注意这里是可以被不同线程调用的，所以有并发冲突问题。
-        // 因此任务队列taskQueue 必须是一个线程安全的队列，就是可以处理并发问题。
+        // 因此任务队列taskQueue 必须是一个线程安全的队列
         addTask(task);
         if (!inEventLoop) {
             // 执行当前代码的线程不是eventloop线程，需要开启线程
@@ -1193,6 +1195,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 // 获取当前线程，赋值给 thread，就是执行器线程
                 thread = Thread.currentThread();
                 if (interrupted) {
+                    // 调用interruptThread()中断当前任务时没有thread值时会设置interrupted标识,现在来调用interrupt方法
                     thread.interrupt();
                 }
 
