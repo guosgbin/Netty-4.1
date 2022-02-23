@@ -26,6 +26,7 @@ import java.util.NoSuchElementException;
  */
 final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
 
+    // 准备就绪的 Key 的容器
     SelectionKey[] keys;
     // 数组可读大小
     int size;

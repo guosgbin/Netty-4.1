@@ -135,13 +135,19 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     //    AWAKE            when EL is awake
     //    NONE             when EL is waiting with no wakeup scheduled
     //    other value T    when EL is waiting with wakeup scheduled at time T
+    // nextWakeupNanos is:
+    //    AWAKE            表示 已经是唤醒状态，为了阻止不必要的选择器唤醒
+    //    NONE             表示 Schedule 调度任务队列中没有 到时间 要执行的调度任务
+    //    other value T    表示 Schedule 调度任务队列中有 到时间 要执行的调度任务,需要在 T 时间执行
     private final AtomicLong nextWakeupNanos = new AtomicLong(AWAKE);
 
     // 选择器提供策略
     private final SelectStrategy selectStrategy;
 
+    // I/O 事件的执行时间和本地队列任务执行时间的占比
     private volatile int ioRatio = 50;
     private int cancelledKeys;
+    // 每当256个Channel从Selector上移除时，就会去标记needsToSelectAgain为true
     private boolean needsToSelectAgain;
 
     /**
@@ -200,12 +206,14 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private SelectorTuple openSelector() {
         final Selector unwrappedSelector;
         try {
+            // 获取 JDK 原生的选择器对象
             unwrappedSelector = provider.openSelector();
         } catch (IOException e) {
             throw new ChannelException("failed to open a new selector", e);
         }
 
         if (DISABLE_KEY_SET_OPTIMIZATION) {
+            // 配置的是不优化选择器，直接返回
             return new SelectorTuple(unwrappedSelector);
         }
 
@@ -245,19 +253,15 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                     // 通过反射获取selectedKeys和publicSelectedKeys两个字段
                     Field selectedKeysField = selectorImplClass.getDeclaredField("selectedKeys");
                     Field publicSelectedKeysField = selectorImplClass.getDeclaredField("publicSelectedKeys");
-
                     if (PlatformDependent.javaVersion() >= 9 && PlatformDependent.hasUnsafe()) {
                         // Let us try to use sun.misc.Unsafe to replace the SelectionKeySet.
                         // This allows us to also do this in Java9+ without any extra flags.
                         long selectedKeysFieldOffset = PlatformDependent.objectFieldOffset(selectedKeysField);
-                        long publicSelectedKeysFieldOffset =
-                                PlatformDependent.objectFieldOffset(publicSelectedKeysField);
-
+                        long publicSelectedKeysFieldOffset = PlatformDependent.objectFieldOffset(publicSelectedKeysField);
                         if (selectedKeysFieldOffset != -1 && publicSelectedKeysFieldOffset != -1) {
-                            PlatformDependent.putObject(
-                                    unwrappedSelector, selectedKeysFieldOffset, selectedKeySet);
-                            PlatformDependent.putObject(
-                                    unwrappedSelector, publicSelectedKeysFieldOffset, selectedKeySet);
+                            // 将上面获取的两个属性重新赋值为Netty的SelectedSelectionKeySet
+                            PlatformDependent.putObject(unwrappedSelector, selectedKeysFieldOffset, selectedKeySet);
+                            PlatformDependent.putObject(unwrappedSelector, publicSelectedKeysFieldOffset, selectedKeySet);
                             return null;
                         }
                         // We could not retrieve the offset, lets try reflection as last-resort.
@@ -285,6 +289,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         });
 
         if (maybeException instanceof Exception) {
+            // 发生了异常
             selectedKeys = null;
             Exception e = (Exception) maybeException;
             logger.trace("failed to instrument a special java.util.Set into: {}", unwrappedSelector, e);
@@ -854,6 +859,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 ops &= ~SelectionKey.OP_CONNECT;
                 k.interestOps(ops);
 
+                // 连接完成则调用finishiConnect操作
                 unsafe.finishConnect();
             }
 
@@ -875,6 +881,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 unsafe.read();
             }
         } catch (CancelledKeyException ignored) {
+            // key失效则close这个channel
             unsafe.close(unsafe.voidPromise());
         }
     }

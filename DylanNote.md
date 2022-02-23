@@ -44,10 +44,10 @@ ByteBuf分类，作用
 
 ===========
 
-- SingleThreadEventExecutor
+- SingleThreadEventExecutor OK
     - DefaultEventExecutor
-    - NioEventLoop
-- ThreadExecutorMap
+    - NioEventLoop OK
+- ThreadExecutorMap OK
 
 =====
 - EventExecutorGroup
