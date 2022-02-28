@@ -55,6 +55,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannel.class);
 
+    // 父 Channel
     private final Channel parent;
     // 全局唯一的ID
     private final ChannelId id;
@@ -69,7 +70,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
     private volatile SocketAddress remoteAddress;
     // 每个Channel对应一个EventLoop线程
     private volatile EventLoop eventLoop;
-    // 是否已经注册过
+    // 是否已经注册过,绑定 EventLoop
     private volatile boolean registered;
     // 保证close方法只调用一次，不能重复调用
     private boolean closeInitiated;
@@ -111,6 +112,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         pipeline = newChannelPipeline();
     }
 
+    /**
+     * TODO-KWOK 修改直译
+     * 获取每次事件循环运行时要写入的最大消息数。
+     * 一旦达到此限制，我们将在尝试写入剩余消息之前继续处理其他事件。
+     */
     protected final int maxMessagesPerWrite() {
         ChannelConfig config = config();
         if (config instanceof DefaultChannelConfig) {
@@ -143,12 +149,18 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         return new DefaultChannelPipeline(this);
     }
 
+    /**
+     * 返回当前输出缓存区是否可写
+     */
     @Override
     public boolean isWritable() {
         ChannelOutboundBuffer buf = unsafe.outboundBuffer();
         return buf != null && buf.isWritable();
     }
 
+    /**
+     * 获取在 isWritable() 返回 false 之前还能写入多少数据
+     */
     @Override
     public long bytesBeforeUnwritable() {
         ChannelOutboundBuffer buf = unsafe.outboundBuffer();
@@ -157,6 +169,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         return buf != null ? buf.bytesBeforeUnwritable() : 0;
     }
 
+    /**
+     * TODO_KWOK
+     */
     @Override
     public long bytesBeforeWritable() {
         ChannelOutboundBuffer buf = unsafe.outboundBuffer();
@@ -189,6 +204,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         return eventLoop;
     }
 
+    /**
+     * 返回此 Channel 绑定的本地地址
+     */
     @Override
     public SocketAddress localAddress() {
         SocketAddress localAddress = this.localAddress;
@@ -213,6 +231,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         localAddress = null;
     }
 
+    /**
+     * 获取远程连接地址
+     */
     @Override
     public SocketAddress remoteAddress() {
         SocketAddress remoteAddress = this.remoteAddress;
@@ -242,6 +263,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         return registered;
     }
 
+    /**
+     * 调用 Pipeline 的方法，会调用 TailContext 的方法
+     */
     @Override
     public ChannelFuture bind(SocketAddress localAddress) {
         return pipeline.bind(localAddress);
@@ -491,7 +515,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         /**
          * 注册方法
          *
-         * @param eventLoop
+         * @param eventLoop 当前 Channel 要绑定的 EventLoop 对象
          * @param promise
          */
         @Override
@@ -553,7 +577,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
+                // 模板方法-子类实现
                 doRegister();
+                // 表示不是第一次实现
                 neverRegistered = false;
                 // 表示当前Channel已经注册到Selector了
                 registered = true;
@@ -566,7 +592,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
                 // 设置promise结果为成功，notifyAll等待的线程，回调注册相关的promise的Listener
                 safeSetSuccess(promise);
-                // 向当前Channel的pipeline发起一个 注册完成时间， 关注的handlder可以做一些自己的事情
+                // 向当前Channel的pipeline发起一个 注册完成事件， 关注这个事件的handlder可以做一些自己的事情
                 logger.warn("Channel: {} 注册到Selector完成, 发布ChannelRegistered事件...", promise.channel().getClass().getSimpleName());
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
@@ -1046,6 +1072,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         @SuppressWarnings("deprecation")
         protected void flush0() {
             if (inFlush0) {
+                // 防止重复刷新
                 // Avoid re-entrance
                 return;
             }

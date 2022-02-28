@@ -729,6 +729,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     final void invokeHandlerAddedIfNeeded() {
         assert channel.eventLoop().inEventLoop();
         if (firstRegistration) {
+            // 如果是第一次注册，执行 pendingHandlerCallbackHead 任务链表中的任务
             firstRegistration = false;
             // We are now registered to the EventLoop. It's time to call the callbacks for the ChannelHandlers,
             // that were added before the registration was done.

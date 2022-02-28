@@ -113,6 +113,7 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     /**
      * Returns the parent of this channel.
      * 返回此 Channel 的父 Channel
+     * 假如没有父 Channel 则返回 null
      *
      * @return the parent channel.
      *         {@code null} if this channel does not have a parent channel.
@@ -199,36 +200,57 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
      * requested write operation immediately.  Any write requests made when
      * this method returns {@code false} are queued until the I/O thread is
      * ready to process the queued write requests.
+     *
+     * 当且仅当 I/O 线程将立即执行请求的写入操作时返回true
+     * 当此方法返回false时发出的任何写入请求都会排队，直到 I/O 线程准备好处理排队的写入请求。
      */
     boolean isWritable();
 
     /**
      * Get how many bytes can be written until {@link #isWritable()} returns {@code false}.
      * This quantity will always be non-negative. If {@link #isWritable()} is {@code false} then 0.
+     *
+     * 获取在isWritable()返回false之前可以写入多少字节
+     * 这个数量总是非负的。如果isWritable()为false ，则为 0
      */
     long bytesBeforeUnwritable();
 
     /**
      * Get how many bytes must be drained from underlying buffers until {@link #isWritable()} returns {@code true}.
      * This quantity will always be non-negative. If {@link #isWritable()} is {@code true} then 0.
+     *
+     * 获取在 isWritable() 返回 true 之前必须从底层缓冲区排出多少字节。
+     * 这个数量总是非负的。如果 isWritable() 是true那么 0。
      */
     long bytesBeforeWritable();
 
     /**
      * Returns an <em>internal-use-only</em> object that provides unsafe operations.
+     *
+     * 返回提供不安全操作的仅供内部使用的对象
      */
     Unsafe unsafe();
 
     /**
      * Return the assigned {@link ChannelPipeline}.
+     *
+     * 返回此通道绑定的 ChannelPipeline
      */
     ChannelPipeline pipeline();
 
     /**
      * Return the assigned {@link ByteBufAllocator} which will be used to allocate {@link ByteBuf}s.
+     *
+     * 获取ByteBuf分配器
      */
     ByteBufAllocator alloc();
 
+    /**
+     * 从远端读取数据
+     * 默认实现通过 DefaultChannelPipeline 中的内部类 HeadContext 的 read 方法，
+     * 调用 Unsafe 的 beginRead() 方法，开始从远端读取消息。
+     * @return
+     */
     @Override
     Channel read();
 
@@ -335,8 +357,8 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
          * Deregister the {@link Channel} of the {@link ChannelPromise} from {@link EventLoop} and notify the
          * {@link ChannelPromise} once the operation was complete.
          *
-         * 立即关闭通道而不触发任何事件。
-         * 可能只有注册尝试失败时才调用。
+         *
+         * 从 EventLoop 注销 ChannelPromise 的 Channel，并在操作完成后通知 ChannelPromise。
          */
         void deregister(ChannelPromise promise);
 

@@ -17,7 +17,7 @@ ByteBuf分类，作用
 
 
 
-## EventExecutor和EventLoop接口分析
+## EventExecutor和EventLoop接口分析 OK
 
 这几个都是JDK的接口
 - Executor 接口
@@ -30,7 +30,7 @@ ByteBuf分类，作用
 - EventLoopGroup 接口 OK
 - EventLoop 接口 OK
    
-## EventExecutor和EventLoop的抽象基类 
+## EventExecutor和EventLoop的抽象基类  OK
 - AbstractEventExecutor OK
     - AbstractScheduledEventExecutor OK
   
@@ -50,13 +50,13 @@ ByteBuf分类，作用
 - ThreadExecutorMap OK
 
 =====
-- EventExecutorGroup
-- AbstractEventExecutorGroup
-- MultithreadEventExecutorGroup
-- EventExecutorChooser
-- MultithreadEventLoopGroup
-- NioEventLoopGroup
-- NIoEventLoop
+- EventExecutorGroup OK
+- AbstractEventExecutorGroup OK
+- MultithreadEventExecutorGroup OK
+- EventExecutorChooser OK
+- MultithreadEventLoopGroup OK
+- NioEventLoopGroup OK
+- NIoEventLoop OK
 
 DefaultEventLoopGroup 默认的
 
