@@ -150,14 +150,17 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
         final SelectionKey key = selectionKey();
         final int interestOps = key.interestOps();
 
+        // 获取一次写 能写多少次
         int maxMessagesPerWrite = maxMessagesPerWrite();
         while (maxMessagesPerWrite > 0) {
             Object msg = in.current();
             if (msg == null) {
+                // 出站缓冲区没有数据了，已经读取完了
                 break;
             }
             try {
                 boolean done = false;
+                // 按照配置中的 循环最大次数进行循环写
                 for (int i = config().getWriteSpinCount() - 1; i >= 0; i--) {
                     if (doWriteMessage(msg, in)) {
                         done = true;
@@ -167,8 +170,10 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
 
                 if (done) {
                     maxMessagesPerWrite--;
+                    // 假如发送成功，则移除缓存链表中的数据
                     in.remove();
                 } else {
+                    // 没写成功，跳出循环，后面会继续关注写事件
                     break;
                 }
             } catch (Exception e) {
@@ -181,12 +186,14 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
             }
         }
         if (in.isEmpty()) {
+            // 已经将缓冲区完全写完了，此时需要取消关注 OP_WRITE 事件
             // Wrote all messages.
             if ((interestOps & SelectionKey.OP_WRITE) != 0) {
                 key.interestOps(interestOps & ~SelectionKey.OP_WRITE);
             }
         } else {
             // Did not write all messages.
+            // 还有消息未写完，继续关注 OP_WRITE 事件
             if ((interestOps & SelectionKey.OP_WRITE) == 0) {
                 key.interestOps(interestOps | SelectionKey.OP_WRITE);
             }

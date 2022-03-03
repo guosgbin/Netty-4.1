@@ -41,13 +41,14 @@ import static io.netty.channel.internal.ChannelUtils.WRITE_STATUS_SNDBUF_FULL;
  * {@link AbstractNioChannel} base class for {@link Channel}s that operate on bytes.
  */
 public abstract class AbstractNioByteChannel extends AbstractNioChannel {
+    // Channel 通道的 METADATA 数据
     private static final ChannelMetadata METADATA = new ChannelMetadata(false, 16);
     private static final String EXPECTED_TYPES =
             " (expected: " + StringUtil.simpleClassName(ByteBuf.class) + ", " +
             StringUtil.simpleClassName(FileRegion.class) + ')';
 
     // 负责刷新发送缓存链表中的数据
-    // write的数据没有直接写在Socket中，而是写在了ChannelOutBoundBuffer缓存区中
+    // write的数据没有直接写在Socket中，而是写在了ChannelOutBoundBuffer出站缓存区中
     // 调flush方法会把数据写入Socket并向网络中发送。
     // 当缓存中的数据未发送完成时，需要将此任务添加到EventLoop线程中，等待EventLoop线程的再次发送
     private final Runnable flushTask = new Runnable() {
@@ -154,7 +155,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             }
             // 获取客户端的pipeline对象
             final ChannelPipeline pipeline = pipeline();
-            // 获取缓冲区分配器
+            // 获取缓冲区分配器，默认是PooledByteBufAllocator
             final ByteBufAllocator allocator = config.getAllocator();
             // 控制读循环和预测下次创建的bytebuf的容量大小
             final RecvByteBufAllocator.Handle allocHandle = recvBufAllocHandle();
@@ -178,6 +179,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                         close = allocHandle.lastBytesRead() < 0;
                         if (close) {
                             // There is nothing left to read as we received an EOF.
+                            // 此时是 -1
                             readPending = false;
                         }
                         break;
@@ -186,6 +188,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                     // 更新缓冲区预测分配器 读取消息数量
                     allocHandle.incMessagesRead(1);
                     readPending = false;
+                    // 因为 TCP 有粘包问题
                     // 向客户端pipeline发送channelRead事件，该pipeline实现了channelRead的Handler就可以进行业务处理了
                     pipeline.fireChannelRead(byteBuf);
                     byteBuf = null;
@@ -197,6 +200,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 pipeline.fireChannelReadComplete();
 
                 if (close) {
+                    // 如果连接对端关闭了，则关闭读操作
                     closeOnRead(pipeline);
                 }
             } catch (Throwable t) {
@@ -229,6 +233,11 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
      *     data was accepted</li>
      * </ul>
      * @throws Exception if an I/O exception occurs during write.
+     */
+    /**
+     *
+     * @param in 写缓冲区 ChannelOutboundBuffer 对象
+     * @return
      */
     protected final int doWrite0(ChannelOutboundBuffer in) throws Exception {
         Object msg = in.current();
@@ -325,8 +334,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         } while (writeSpinCount > 0);
 
         /*
-         * 当因为缓存区满了而发送失败时
-         * doWriteInternal返回Integer.MAX_VALUE
+         * 当因为缓存区满了而发送失败时，doWriteInternal返回Integer.MAX_VALUE
          * 此时writeSpinCount < 0为true，
          * 当发送16次还未全部发送完，但每次都写成功,writeSpinCount为0
          */

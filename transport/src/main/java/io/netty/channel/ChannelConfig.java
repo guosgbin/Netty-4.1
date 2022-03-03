@@ -147,6 +147,10 @@ public interface ChannelConfig {
      * It is similar to what a spin lock is used for in concurrency programming.
      * It improves memory utilization and write throughput depending on
      * the platform that JVM runs on.  The default value is {@code 16}.
+     *
+     * 返回写入操作的最大循环计数，直到WritableByteChannel.write(ByteBuffer)返回非零值。
+     * 它类似于在并发编程中使用自旋锁。
+     * 它根据运行 JVM 的平台提高内存利用率和写入吞吐量。默认值为16 。
      */
     int getWriteSpinCount();
 

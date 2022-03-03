@@ -206,9 +206,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
         /**
          * Finish connect
-         * 结束连接
-         * 在 NioEventLoop 的 processSelectedKey 方法中调用，
-         * 当底层的NIO通道接收到连接事件 OP_CONNECT 时调用
+         * NioEventLoop#processSelectedKey()方法中，假如 NIO 通道接收到连接事件 OP_CONNECT 时调用
          */
         void finishConnect();
 
@@ -216,15 +214,13 @@ public abstract class AbstractNioChannel extends AbstractChannel {
          * Read from underlying {@link SelectableChannel}
          *
          * NIO的 SelectableChannel通道中获取到远端的数据
-         * 在 NioEventLoop 的 processSelectedKey 方法中调用，
-         * 当底层的NIO通道接收到读取事件 OP_READ 时调用。
+         * NioEventLoop#processSelectedKey()方法中，假如 NIO 通道接收到 OP_READ 和 OP_ACCEPT 时调用
          */
         void read();
 
         /**
          * 强制刷新；
-         * 在 NioEventLoop 的 processSelectedKey 方法中调用，
-         * 当底层的NIO通道接收到可写事件 OP_WRITE 时调用。
+         * NioEventLoop#processSelectedKey()方法中，假如 NIO 通道接收到可写事件 OP_WRITE 时调用
          */
         void forceFlush();
     }
@@ -260,7 +256,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             }
 
             try {
-                // 当 connectPromise 不为空，说明已经有人尝试连接了
+                // 当 connectPromise 不为空，表示已经有人尝试连接了
                 // 确保没有正在进行的连接
                 if (connectPromise != null) {
                     // Already a connect in process.
@@ -268,19 +264,19 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                 }
 
                 boolean wasActive = isActive();
-                // 调用 AbstractNioChannel 的 doConnect 方法进行连接
+                // 模板方法子类实现 NioSocketChannel
                 if (doConnect(remoteAddress, localAddress)) {
                     // 完成 ChannelPromise 的通知，以及是否发送 ChannelActive 事件和 ChannelInactive 事件。
                     fulfillConnectPromise(promise, wasActive);
                 } else {
+                    // 前提条件此次连接失败
                     connectPromise = promise;
                     requestedRemoteAddress = remoteAddress;
 
                     // Schedule connect timeout.
                     int connectTimeoutMillis = config().getConnectTimeoutMillis();
                     if (connectTimeoutMillis > 0) {
-                        // 设置一个超时任务，规定时间内，它没有被取消，就会 close(voidPromise()) 关闭通道
-                        // 在 finishConnect() 和 doClose() 方法中，会取消这个超时任务
+                        // 设置一个超时任务，规定时间内没有连接成功，则关闭通道
                         connectTimeoutFuture = eventLoop().schedule(new Runnable() {
                             @Override
                             public void run() {
@@ -358,11 +354,12 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             // Note this method is invoked by the event loop only if the connection attempt was
             // neither cancelled nor timed out.
 
+            // 请注意，仅当连接尝试既未取消也未超时时，事件循环才会调用此方法。
             assert eventLoop().inEventLoop();
 
             try {
                 boolean wasActive = isActive();
-                // 调用 AbstractNioChannel 的 doFinishConnect 方法进行完成连接操作
+                // 模板方法 子类实现
                 doFinishConnect();
                 // 完成 ChannelPromise 的通知，以及是否发送 ChannelActive 事件和 ChannelInactive 事件。
                 fulfillConnectPromise(connectPromise, wasActive);
@@ -384,6 +381,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             // Flush immediately only when there's no pending flush.
             // If there's a pending flush operation, event loop will call forceFlush() later,
             // and thus there's no need to call it now.
+            // 只有在没有挂起的刷新时才立即刷新。
+            // 如果有一个挂起的刷新操作，事件循环稍后会调用 forceFlush() ，因此现在不需要调用它。
             if (!isFlushPending()) {
                 super.flush0();
             }
@@ -397,6 +396,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
         private boolean isFlushPending() {
             SelectionKey selectionKey = selectionKey();
+            // selectionKey有效，且是 OP_WRITE 事件
             return selectionKey.isValid() && (selectionKey.interestOps() & SelectionKey.OP_WRITE) != 0;
         }
     }
