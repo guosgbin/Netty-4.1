@@ -318,7 +318,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     }
 
     /**
-     * 与客户端连接
+     * 与服务端连接
      *
      * @param remoteAddress
      * @param localAddress
@@ -337,7 +337,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             // 获取JDK层面的SocketChannel，进行连接
             boolean connected = SocketUtils.connect(javaChannel(), remoteAddress);
             if (!connected) {
-                // 没有连接成功，就将 SelectionKey 接收连接事件 OP_CONNECT
+                // 没有连接成功，就将 SelectionKey 关注连接事件 OP_CONNECT
                 selectionKey().interestOps(SelectionKey.OP_CONNECT);
             }
             success = true;
