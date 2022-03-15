@@ -112,7 +112,9 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
     }
 
     private final class HandleImpl extends MaxMessageHandle {
+        // 最小的在 SIZE_TABLE 的索引
         private final int minIndex;
+        // 最大的在 SIZE_TABLE 的索引
         private final int maxIndex;
         // 当前缓冲区大小 在数组中的索引
         private int index;
@@ -155,6 +157,9 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
          */
         private void record(int actualReadBytes) {
             // 连续两次小，才会进行缩减
+            // 索引减量 INDEX_DECREMENT 为 1
+            // 条件: 实际读取的字节数 <= index - INDEX_DECREMENT 位置的大小
+            // 说明需要缩小
             if (actualReadBytes <= SIZE_TABLE[max(0, index - INDEX_DECREMENT)]) {
                 if (decreaseNow) {
                     // 减少，索引-1，不小于最小索引
@@ -166,7 +171,10 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
                     // 第一次设置成true
                     decreaseNow = true;
                 }
-            } else if (actualReadBytes >= nextReceiveBufferSize) { // 扩大
+            }
+            // INDEX_INCREMENT 4
+            // 条件：实际读取的字节数 >= 预测的大小，则需要扩容
+            else if (actualReadBytes >= nextReceiveBufferSize) {
                 index = min(index + INDEX_INCREMENT, maxIndex);
                 nextReceiveBufferSize = SIZE_TABLE[index];
                 decreaseNow = false;
@@ -183,7 +191,7 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
     private final int minIndex;
     // 记录最大大小索引
     private final int maxIndex;
-    // 记录初始尺寸的索引
+    // 记录初始尺寸
     private final int initial;
 
     /**

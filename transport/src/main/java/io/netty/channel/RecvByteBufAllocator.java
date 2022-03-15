@@ -58,7 +58,7 @@ public interface RecvByteBufAllocator {
          * read loop.
          * <p>
          * This may be used by {@link #continueReading()} to determine if the read operation should complete.
-         * </p>
+         * </p
          * This is only ever a hint and may be ignored by the implementation.
          * @param config The channel configuration which may impact this object's behavior.
          */
