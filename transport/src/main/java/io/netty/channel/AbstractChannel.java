@@ -1002,6 +1002,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
          * 4 通过 outboundBuffer.addMessage(...) 方法，将数据添加到写缓冲区 outboundBuffer 中。
          * 5 如果发送异常，记得释放数据 msg 的引用，防止内存泄露，并进行操作失败通知。
          *
+         * msg 大概率是 ByteBuf 对象
+         *
          * @param msg
          * @param promise
          */

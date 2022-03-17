@@ -176,6 +176,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     @Override
     public ChannelHandlerContext fireChannelRegistered() {
         // findContextInbound方法 会找到当前ctx后面的ctx中实现了 CHANNEL_REGISTERED方法的ctx，其实是ctx中的handler的实现
+        // 0000 0000 0000 0000 0000 0000 0000 0010
         invokeChannelRegistered(findContextInbound(MASK_CHANNEL_REGISTERED));
         return this;
     }
@@ -781,8 +782,11 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     private void invokeFlush() {
         if (invokeHandler()) {
+            // 调用当前上下文对应处理器的 flush 处理方法
             invokeFlush0();
         } else {
+            // 当前上下文对应的处理器不处理，
+            // 继续在管道中寻找下一个事件处理器处理
             flush();
         }
     }
@@ -932,6 +936,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         EventExecutor currentExecutor = executor();
         do {
             ctx = ctx.next;
+            // 0000 0000 0000 0000 0000 0001 1111 1110
         } while (skipContext(ctx, currentExecutor, mask, MASK_ONLY_INBOUND));
         return ctx;
     }
@@ -973,6 +978,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         // Ensure we correctly handle MASK_EXCEPTION_CAUGHT which is not included in the MASK_EXCEPTION_CAUGHT
         // (ctx.executor() == currentExecutor && (ctx.executionMask & mask) == 0)
         // 只有当 EventExecutor 相同的时候，才会考虑是否跳过 ctx，因为我们要保证事件处理的顺序。
+
+        // onlyMask 0000 0000 0000 0000 0000 0001 1111 1110
+        // mask     0000 0000 0000 0000 0000 0000 0000 0010
         return (ctx.executionMask & (onlyMask | mask)) == 0 ||
                 // We can only skip if the EventExecutor is the same as otherwise we need to ensure we offload
                 // everything to preserve ordering.

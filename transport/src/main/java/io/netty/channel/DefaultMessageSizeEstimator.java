@@ -33,6 +33,11 @@ public final class DefaultMessageSizeEstimator implements MessageSizeEstimator {
             this.unknownSize = unknownSize;
         }
 
+        /**
+         * 计算不同类型的 数据量大小
+         * @param msg       The message for which the size should be calculated
+         * @return
+         */
         @Override
         public int size(Object msg) {
             if (msg instanceof ByteBuf) {

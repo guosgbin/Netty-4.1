@@ -44,7 +44,7 @@ import static java.lang.Math.min;
  * outbound write requests.
  * <p>
  * All methods must be called by a transport implementation from an I/O thread, except the following ones:
- * <ul>
+ * <ul>o
  * <li>{@link #size()} and {@link #isEmpty()}</li>
  * <li>{@link #isWritable()}</li>
  * <li>{@link #getUserDefinedWritability(int)} and {@link #setUserDefinedWritability(int, boolean)}</li>
@@ -96,7 +96,7 @@ public final class ChannelOutboundBuffer {
      *
      * 业务接下来调用ctx.flush()， 最终会触发unsafe.flush()
      * unsafe.flush{
-     *      1.channelOutboundBuffer.addFlush() 这个方法会将flushedEntry执行unflushedEntry的元素，flushedEntry -> e1
+     *      1.channelOutboundBuffer.addFlush() 这个方法会将flushedEntry指向unflushedEntry的元素，flushedEntry -> e1
      *      2.channelOutboundBuffer.nioBuffer(...) 这个方法将会返回ByteBuffer[] 数组，提供下面逻辑使用
      *      3.遍历ByteBuffer数组，调用JDK channel.write(buffer) 该方法会返回真正写入socket缓冲区的字节数量，结果为res
      *      4.根据res移除 出站缓冲区内对应的entry
@@ -170,6 +170,7 @@ public final class ChannelOutboundBuffer {
     public void addMessage(Object msg, int size, ChannelPromise promise) {
         // 将提供的消息封装为一个 Entry 对象
         Entry entry = Entry.newInstance(msg, size, total(msg), promise);
+        // 包装的 entry 对象假如到 entry 链表中，表示数据入站到出站缓冲区
         if (tailEntry == null) {
             flushedEntry = null;
         } else {
@@ -942,6 +943,7 @@ public final class ChannelOutboundBuffer {
             Entry entry = RECYCLER.get();
             // 赋值
             entry.msg = msg;
+            // 加上本身的 96 的大小
             entry.pendingSize = size + CHANNEL_OUTBOUND_BUFFER_ENTRY_OVERHEAD;
             entry.total = total;
             entry.promise = promise;
