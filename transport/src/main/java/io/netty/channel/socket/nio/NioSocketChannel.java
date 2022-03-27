@@ -426,20 +426,21 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             // 缓存中数据为空，没有数据可写
             if (in.isEmpty()) {
                 // All written so clear OP_WRITE
+                // 正常退出 doWrite 走这里
                 // 移除写事件，并直接返回，移除当前ch的selector注册的OP_WRITE事件
                 clearOpWrite();
                 // Directly return here so incompleteWrite(...) is not called.
                 return;
             }
 
-            // 执行到这里说明当前ch的出站缓冲区里面还有剩余的entry待刷新
+            // 执行到这里说明当前 Channel 的出站缓冲区里面还有剩余的entry待刷新
 
             // Ensure the pending writes are made of ByteBufs only.
-            // 获取一次最大可写字节数 限定每次从出站缓冲区内转换多少ByteBuf字节数据的一个变量，该变量会随着ch的状态不断变化
+            // 获取一次最大可写字节数 限定每次从出站缓冲区内转换多少ByteBuf字节数据的一个变量，该变量会随着 Channel 的状态不断变化
             int maxBytesPerGatheringWrite = ((NioSocketChannelConfig) config).getMaxBytesPerGatheringWrite();
-            // 将出站缓冲区的部分Entry.msg 转换为JDK Channel依赖的标准对象ByteBuffer 这里返回的是数组
-            // 参数1：最多转换1024个对象
-            // 参数2：nioBuffers方法最多转换
+            // 将出站缓冲区的部分 Entry.msg 转换为JDK Channel依赖的标准对象ByteBuffer 这里返回的是数组
+            // 参数1：最多转换1024个 ByteBuffer 对象
+            // 参数2：nioBuffers方法最多转换 maxBytes 个字节的 ByteBuf 对象
             ByteBuffer[] nioBuffers = in.nioBuffers(1024, maxBytesPerGatheringWrite);
             int nioBufferCnt = in.nioBufferCount();
 
@@ -461,12 +462,14 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
                     int attemptedBytes = buffer.remaining();
                     // 将buffer写到到Socket缓存中，有可能全部写进去了，也有可能写了一部分，也有可能全部写失败的
                     final int localWrittenBytes = ch.write(buffer);
-                    // 发送失败
+                    // 发送失败，说明底层 socket 写缓冲区已经满了，本次 write 没写进去
                     if (localWrittenBytes <= 0) {
-                        // 将写事件添加到事件兴趣集中
+                        // 将写事件添加到事件兴趣集中，等待socket 写缓冲区有空闲空间后，继续写
                         incompleteWrite(true);
                         return;
                     }
+
+                    // 执行到这里，说明 buffer 可能数据全部写入到 socket 缓存区，也可能写了一部分数据到 socket 缓存区
                     adjustMaxBytesPerGatheringWrite(attemptedBytes, localWrittenBytes, maxBytesPerGatheringWrite);
                     // 移除写成功的字节数
                     in.removeBytes(localWrittenBytes);
