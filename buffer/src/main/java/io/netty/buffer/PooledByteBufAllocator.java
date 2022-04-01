@@ -41,9 +41,9 @@ import java.util.concurrent.TimeUnit;
 public class PooledByteBufAllocator extends AbstractByteBufAllocator implements ByteBufAllocatorMetricProvider {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(PooledByteBufAllocator.class);
-    // 默认HEAP_ARENA个数 CPU的个数的2倍
+    // 默认HEAP_ARENA个数 CPU的核心个数的2倍
     private static final int DEFAULT_NUM_HEAP_ARENA;
-    // 默认DIRECT_ARENA个数 CPU的个数的2倍
+    // 默认DIRECT_ARENA个数 CPU的核心个数的2倍
     private static final int DEFAULT_NUM_DIRECT_ARENA;
 
     // 默认内存页大小 8k
@@ -56,7 +56,7 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
     private static final int DEFAULT_NORMAL_CACHE_SIZE;
     // MemoryRegionCache的最大缓存规格 32k
     static final int DEFAULT_MAX_CACHED_BUFFER_CAPACITY;
-    // 清理线程本地缓存需要调用 get 方法的次数 默认8192
+    // 清理线程本地缓存需要在缓存中分配内存的次数 默认8192
     private static final int DEFAULT_CACHE_TRIM_INTERVAL;
     // 定时任务去清理线程本地缓存 默认是0
     private static final long DEFAULT_CACHE_TRIM_INTERVAL_MILLIS;

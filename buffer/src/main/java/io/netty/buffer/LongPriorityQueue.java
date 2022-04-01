@@ -20,6 +20,8 @@ import java.util.Arrays;
 /**
  * Internal primitive priority queue, used by {@link PoolChunk}.
  * The implementation is based on the binary heap, as described in Algorithms by Sedgewick and Wayne.
+ *
+ * 小顶堆 有效元素从 1 开始
  */
 final class LongPriorityQueue {
     public static final int NO_VALUE = -1;
@@ -30,11 +32,14 @@ final class LongPriorityQueue {
         if (handle == NO_VALUE) {
             throw new IllegalArgumentException("The NO_VALUE (" + NO_VALUE + ") cannot be added to the queue.");
         }
+        // 元素个数 +1
         size++;
         if (size == array.length) {
             // Grow queue capacity.
+            // 扩容
             array = Arrays.copyOf(array, 1 + (array.length - 1) * 2);
         }
+        // 设置新值
         array[size] = handle;
         lift(size);
     }
@@ -95,13 +100,29 @@ final class LongPriorityQueue {
         }
     }
 
+    /**
+     * 判断 a 位置的元素是否大于 b 位置
+     */
     private boolean subord(int a, int b) {
         return array[a] > array[b];
     }
 
+    /**
+     * 元素交换
+     */
     private void swap(int a, int b) {
         long value = array[a];
         array[a] = array[b];
         array[b] = value;
+    }
+
+    public static void main(String[] args) {
+        LongPriorityQueue queue = new LongPriorityQueue();
+        queue.offer(121);
+        queue.offer(3);
+        queue.offer(423);
+        queue.offer(1);
+        System.out.println();
+        System.out.println(queue.poll());
     }
 }

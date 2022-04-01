@@ -670,7 +670,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
          * 创建一个新的PoolChunk
          *
          * @param pageSize 一页内存大小 默认8k
-         * @param maxPageIdx 最大页面 索引 默认40
+         * @param maxPageIdx 最大页面个数 索引 默认40
          * @param pageShifts 1左移 pageShifts 位得到pageSize  默认13位
          * @param chunkSize 一个chunk能够管理的最大内存大小 默认16mb
          * @return

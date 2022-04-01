@@ -210,6 +210,14 @@ abstract class SizeClasses implements SizeClassesMetric {
 
     private static final byte no = 0, yes = 1;
 
+    /**
+     * 构建内存管理分块信息
+     *
+     * @param pageSize 页内存大小，默认 8k
+     * @param pageShifts 默认 13
+     * @param chunkSize 默认 16mb
+     * @param directMemoryCacheAlignment
+     */
     protected SizeClasses(int pageSize, int pageShifts, int chunkSize, int directMemoryCacheAlignment) {
         // 页内存大小 默认8k
         this.pageSize = pageSize;
@@ -220,7 +228,7 @@ abstract class SizeClasses implements SizeClassesMetric {
         // 主要是对于Huge这种直接分配的类型的数据将其对其为directMemoryCacheAlignment的倍数
         this.directMemoryCacheAlignment = directMemoryCacheAlignment;
 
-        // 计算出group的数量 24 + 1 - 4 = 21
+        // 计算出group组的数量 24 + 1 - 4 = 21
         int group = log2(chunkSize) + 1 - LOG2_QUANTUM;
 
         //generate size classes
@@ -231,14 +239,17 @@ abstract class SizeClasses implements SizeClassesMetric {
         nSizes = sizeClasses();
 
         //generate lookup table
-
-        // 生成idx对size的表格,这里的sizeIdx2sizeTab存储的就是利用(1 << log2Group) + (nDelta << log2Delta)计算的size
-        // pageIdx2sizeTab则存储的是isMultiPageSize是1的对应的size
+        // nSizes sizeClasses数组的长度 76
+        // sizeIdx2sizeTab 存的是所有的内存块的大小
         sizeIdx2sizeTab = new int[nSizes];
+        // nPSizes pageSize倍数大小的内存的个数 40
+        // pageIdx2sizeTab pageSize倍数大小的内存
         pageIdx2sizeTab = new int[nPSizes];
         idx2SizeTab(sizeIdx2sizeTab, pageIdx2sizeTab);
 
         //生成size对idx的表格,这里存储的是lookupMaxSize以下的,并且其size的单位是1<<LOG2_QUANTUM
+        // 长度 256
+        // 针对小规格内存(小于 4k 的内存), 存的元素是 指定规格大小在sizeClasses的索引值
         size2idxTab = new int[lookupMaxSize >> LOG2_QUANTUM];
         // [0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, +156 more]
         size2idxTab(size2idxTab);
@@ -279,6 +290,7 @@ abstract class SizeClasses implements SizeClassesMetric {
     // 这个表格主要存储的是lookup下的size以每2B为单位存储一个size到其对应的size的缓存值(主要是对小数据类型的对应的idx的查找进行缓存)
 
     // size2idxTab是针对小规格内存大小的，存的元素是 指定规格大小在sizeClasses的索引值
+    // 这个表格主要存储的是lookup下的size以每2B为单位存储一个size到其对应的size的缓存值(主要是对小数据类型的对应的idx的查找进行缓存)
     // [0,1,2,3,4,5,6,7,8,8,9,9,10,10,11,11,12,12,12,12,13,13,13,13,14,14,14,14,15,15,15,15,16,16,16,16,16,16,16,16,17,17,17,17,17,17,17,17,18,18,18,18,18,18,18,18,19,19,19,19,19,19,19,19,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,23,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,24,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,25,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27,27]
     private final int[] size2idxTab;
 
@@ -339,6 +351,7 @@ abstract class SizeClasses implements SizeClassesMetric {
 
     /**
      * calculate size class
+     * sizeClass 方法主要是利用log2Group,log2Delta,nDelta计算出isMultiPage,isSubPage,log2DeltaLookup等其他字段的数据
      *
      * @param index
      * @param log2Group
@@ -582,6 +595,8 @@ abstract class SizeClasses implements SizeClassesMetric {
     }
 
     /**
+     * 获取 pageIdx2sizeTab 的索引
+     *
      * 根据给定的页数来计算出其对应的页的序号，其获取的则是下面表格中最后一列的数值，即为isMultiPageSize是1时从0开始的对size的编号
      * size = 1 << log2Group + nDelta * (1 << log2Delta)
      * log2Group = log2Delta + LOG2_SIZE_CLASS_GROUP

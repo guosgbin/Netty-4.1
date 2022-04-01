@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
@@ -688,5 +689,36 @@ public class PooledByteBufAllocatorTest extends AbstractByteBufAllocatorTest<Poo
         int afterFreeBytes = chunk.freeBytes();
 
         assertTrue(beforeFreeBytes < afterFreeBytes);
+    }
+
+    /**
+     * KWOK
+     */
+    @Test
+    public void testPoolByteBufAllocator() {
+        PooledByteBufAllocator allocator = PooledByteBufAllocator.DEFAULT;
+//        allocator.newDirectBuffer(15, 16);
+        allocator.newDirectBuffer(28 * 1024, 28 * 1024);
+        allocator.newDirectBuffer(28 * 1024, 28 * 1024);
+    }
+
+    /**
+     * KWOK
+     */
+    @Test
+    public void testPoolByteBufAllocator1() throws InterruptedException {
+        PooledByteBufAllocator allocator = PooledByteBufAllocator.DEFAULT;
+        ByteBuf byteBuf = allocator.newDirectBuffer(10 * 1024, 10 * 1024);
+
+        System.gc();
+        System.gc();
+        System.gc();
+        System.gc();
+        System.gc();
+        System.out.println("====");
+        TimeUnit.SECONDS.sleep(10);
+        ByteBuf byteBuf2 = allocator.newDirectBuffer(10 * 1024, 10 * 1024);
+        TimeUnit.SECONDS.sleep(100009);
+        System.out.println("++++");
     }
 }

@@ -142,9 +142,13 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private static final int SUBPAGE_BIT_LENGTH = 1;
     private static final int BITMAP_IDX_BIT_LENGTH = 32;
 
+    // 32
     static final int IS_SUBPAGE_SHIFT = BITMAP_IDX_BIT_LENGTH;
+    // 33
     static final int IS_USED_SHIFT = SUBPAGE_BIT_LENGTH + IS_SUBPAGE_SHIFT;
+    // 34
     static final int SIZE_SHIFT = INUSED_BIT_LENGTH + IS_USED_SHIFT; // 34
+    // 49
     static final int RUN_OFFSET_SHIFT = SIZE_BIT_LENGTH + SIZE_SHIFT;
 
     // 当前PoolChunk所属的Arena
@@ -157,6 +161,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     /**
      * store the first page and last page of each avail run
+     * 存储的是有用的run中的第一个和最后一个Page的句柄
      */
     private final LongLongHashMap runsAvailMap;
 
@@ -164,6 +169,12 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * manage all avail runs
      * 管理所有可用的run，这个数组的索引是SizeClasses中的page2PageIdx计算出来的idx
      * 也就是sizeClass中的每个size 一个优先队列进行存储
+     *
+     * 小顶堆，存储 long 类型的句柄值
+     * 通过 LongPriorityQueue.poll() 方法每次都能获取小顶堆内部的最小的 handle 值。
+     * 这表示我们每次申请内存都是从最低位地址开始分配。
+     * runsAvail数组默认长度为40，所有存储在 LongPriorityQueue 对象的 handle 都表示一个可用的内存块 run。
+     * 并且可分配pageSize大于等于(pageIdx=index)上的pageSize，小于(pageIdex=index+1)的pageSize。
      */
     private final LongPriorityQueue[] runsAvail;
 
@@ -224,6 +235,8 @@ final class PoolChunk<T> implements PoolChunkMetric {
         this.chunkSize = chunkSize;
         freeBytes = chunkSize;
 
+        // 创建长度为 40 的 LongPriorityQueue 数组
+        // 长度为 40 对应 sizeClasses 数组中是 pagesize 倍数的内存的个数
         runsAvail = newRunsAvailqueueArray(maxPageIdx);
         runsAvailMap = new LongLongHashMap(-1);
         // chunkSize >> pageShifts 默认2048
@@ -231,7 +244,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
         //insert initial run, offset = 0, pages = chunkSize / pageSize
         int pages = chunkSize >> pageShifts;
-        // 0010 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
+        // 0b 0010 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
         long initHandle = (long) pages << SIZE_SHIFT;
         // insertAvailRun方法在runsAvail数组最后位置插入一个handle，该handle代表page偏移位置为0的地方可以分配16M的内存块
         insertAvailRun(0, pages, initHandle);
@@ -276,15 +289,19 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * @param handle handle句柄
      */
     private void insertAvailRun(int runOffset, int pages, long handle) {
+        // 将句柄信息写入对应的小顶堆
+        // 根据页数量向下取整，获得「pageIdxFloor」，这个值即将写入对应runsAvail数组索引的值
         // 根据页数获得page的索引pageIdx -1 ，eg. pages=2048,则pageIdx=40，故pageIdxFloor-1=39
         int pageIdxFloor = arena.pages2pageIdxFloor(pages);
         LongPriorityQueue queue = runsAvail[pageIdxFloor];
         queue.offer(handle);
 
         //insert first page of run
+        // 将首页和末页的偏移量和句柄值记录在runsAvailMap对象，待合并run时使用
         insertAvailRun0(runOffset, handle);
         if (pages > 1) {
             //insert last page of run
+            // 当页数量超过1时才会记录末页的偏移量和句柄值
             insertAvailRun0(lastPage(runOffset, pages), handle);
         }
     }
@@ -303,7 +320,9 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private void removeAvailRun(LongPriorityQueue queue, long handle) {
         queue.remove(handle);
 
+        // 获取当前句柄的 页数 的偏移量，也就是在 chunk 中的第几页
         int runOffset = runOffset(handle);
+        // 连续有几个 page
         int pages = runPages(handle);
         //remove first page of run
         runsAvailMap.remove(runOffset);
@@ -366,29 +385,50 @@ final class PoolChunk<T> implements PoolChunkMetric {
         return true;
     }
 
+    /**
+     * 分配内存
+     *
+     * @param runSize 需要分配的内存大小
+     * @return
+     */
     private long allocateRun(int runSize) {
+        // 计算所需 page 的数量
         int pages = runSize >> pageShifts;
-        int pageIdx = arena.pages2pageIdx(pages);
+        // 因为runAvail这个数组用的则是这个idx为索引的
+        // pages2pageIdx方法会将申请内存大小对齐为上述Page表格中的一个size。
+        // 例如申请172032字节(21个page)的内存块，pages2pageIdx方法计算结果为13，实际分配196608(24个page)的内存块。
 
+        // 根据page的数量计算对应的pageIdx，也就是获取 pageIdx2sizeTab[] 的索引
+        // 假如申请 33k ，pages是 5，pages2pageIdx方法计算结果pageIdx为4， 4 位置的大小是 40960
+        int pageIdx = arena.pages2pageIdx(pages);
+        // 这里的runsAvail保证的是runsAvail和runsAvailMap数据的同步
         synchronized (runsAvail) {
             //find first queue which has at least one big enough run
+            // 从当前的pageIdx开始遍历runsAvail,从ranAvail中找到最近的能进行此次分配idx索引
             int queueIdx = runFirstBestFit(pageIdx);
             if (queueIdx == -1) {
                 return -1;
             }
 
             //get run with min offset in this queue
+            // 从这个索引中获取对应的run的数据,即为能进行此次分配的空闲段
             LongPriorityQueue queue = runsAvail[queueIdx];
+            // 通过 LongPriorityQueue.poll() 方法每次都能获取小顶堆内部的最小的 handle 值。这表示我们每次申请内存都是从最低位地址开始分配
+            // 所有存储在 LongPriorityQueue 对象的 handle 都表示一个可用的内存块 run。
+            // 并且可分配pageSize大于等于(pageIdx=index)上的pageSize，小于(pageIdex=index+1)的pageSize。
+            // 找到一个内存句柄
             long handle = queue.poll();
 
             assert handle != LongPriorityQueue.NO_VALUE && !isUsed(handle) : "invalid handle: " + handle;
 
+            // 从runsAvail和runsAvailMap中移除这个handle
             removeAvailRun(queue, handle);
 
             if (handle != -1) {
+                // 将这一块内存进行切分，剩余空闲的内存继续存储到ranAvail和runsAvailMap中
                 handle = splitLargeRun(handle, pages);
             }
-
+            // 更新freeBytes,减少可用内存字节数
             freeBytes -= runSize(pageShifts, handle);
             return handle;
         }
@@ -419,10 +459,18 @@ final class PoolChunk<T> implements PoolChunkMetric {
         return runSize;
     }
 
+    /**
+     * 从pageIdx开始搜索最合适的run用于内存分配
+     *
+     * @param pageIdx
+     * @return
+     */
     private int runFirstBestFit(int pageIdx) {
         if (freeBytes == chunkSize) {
+            // 假如这个 poolChunk 还未开始分配过，第一次分配 39 位置
             return arena.nPSizes - 1;
         }
+        // 从pageIdx向后遍历，找到queue!=null且不为空的LongPriorityQueue
         for (int i = pageIdx; i < arena.nPSizes; i++) {
             LongPriorityQueue queue = runsAvail[i];
             if (queue != null && !queue.isEmpty()) {
@@ -435,24 +483,34 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private long splitLargeRun(long handle, int needPages) {
         assert needPages > 0;
 
+        // 从handle中获取run管理的空闲的page数量
         int totalPages = runPages(handle);
         assert needPages <= totalPages;
 
+        // 分配后剩余page数
         int remPages = totalPages - needPages;
 
+        // 如果还有剩余，需要重新生成run（由handle具象化）并写入两个重要的数据结构中,
+        // 一个是 LongLongHashMap runsAvailMap，另一个是 LongPriorityQueue[] runsAvail;
         if (remPages > 0) {
+            // 获取在 chunk 上的 页的偏移量，也就是第几页
             int runOffset = runOffset(handle);
 
             // keep track of trailing unused pages for later use
+            // 计算剩余page开始偏移量 剩余空闲页偏移量=旧的偏移量+分配页数
             int availOffset = runOffset + needPages;
+            // 根据偏移量、页数量以及isUsed状态生成新的句柄变量，这个变量表示一个全新未使用的run
             long availRun = toRunHandle(availOffset, remPages, 0);
+            // 将availRun插入到runsAvail，runsAvailMap中
             insertAvailRun(availOffset, remPages, availRun);
 
             // not avail
+            // 生成用于此次分配的句柄变量
             return toRunHandle(runOffset, needPages, 1);
         }
 
         //mark it as used
+        // 恰好满足，只需把handle的isUsed标志位置为1
         handle |= 1L << IS_USED_SHIFT;
         return handle;
     }
@@ -471,20 +529,28 @@ final class PoolChunk<T> implements PoolChunkMetric {
         PoolSubpage<T> head = arena.findSubpagePoolHead(sizeIdx);
         synchronized (head) {
             //allocate a new run
+            // 获取申请的size和pageSize的最小公倍数
+            // eg.比如申请内存大小为 16Byte，则只需要等分 1 个page
+            // eg.而申请内存大小为 28KB，需要等分 7 个 page，因为它 28KB=28672 和 pageSize=8192 的最小公倍数为 57344（57344/8192=7）。这样会有2个28K，
             int runSize = calculateRunSize(sizeIdx);
             //runSize must be multiples of pageSize
+            // 申请若干个page，runSize是pageSize的整数倍
             long runHandle = allocateRun(runSize);
             if (runHandle < 0) {
                 return -1;
             }
 
+            // 获取页数偏移量，也就是在 chunk 上的第几页
             int runOffset = runOffset(runHandle);
             assert subpages[runOffset] == null;
+            // 每份子内存的规格
             int elemSize = arena.sizeIdx2size(sizeIdx);
 
             PoolSubpage<T> subpage = new PoolSubpage<T>(head, this, pageShifts, runOffset,
                                runSize(pageShifts, runHandle), elemSize);
 
+            // 由PoolChunk记录新创建的PoolSubpage，数组索引值是首页的偏移量，这个值是唯一的，也是记录在句柄值中
+            // 因此，在归还内存时会通过句柄值找到对应的PoolSubpge对象
             subpages[runOffset] = subpage;
             return subpage.allocate();
         }

@@ -40,14 +40,20 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
     protected static ByteBuf toLeakAwareBuffer(ByteBuf buf) {
         ResourceLeakTracker<ByteBuf> leak;
         switch (ResourceLeakDetector.getLevel()) {
+            // 默认级别
             case SIMPLE:
+                // 每种类型的资源都会创建一个内存泄漏检测器 ResourceLeakDetector
+                // 通过内存泄漏检测器获取弱引用
                 leak = AbstractByteBuf.leakDetector.track(buf);
                 if (leak != null) {
+                    // 假如弱引用不为空，说明这个 ByteBuf 被采集了
+                    // 被采集的话，就需要返回对应级别的包装对象，否则会出现误报
                     buf = new SimpleLeakAwareByteBuf(buf, leak);
                 }
                 break;
             case ADVANCED:
             case PARANOID:
+                // 这两个级别需要追踪 ByteBuf 的调用轨迹，因此返回的包装对象相同
                 leak = AbstractByteBuf.leakDetector.track(buf);
                 if (leak != null) {
                     buf = new AdvancedLeakAwareByteBuf(buf, leak);
