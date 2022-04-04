@@ -298,7 +298,7 @@ abstract class SizeClasses implements SizeClassesMetric {
      * 主要是生成 {@link #sizeClasses} 这个数组
      * 下面的代码其实就是以1<<(LOG2_QUANTUM)为一组，这一组的log2Group和log2Delta是相同，并增长这个nDelta来使得每组数据的两个size的差值相同。
      *
-     * 返回值是 数组真实的大小
+     * 返回值是 数组真实的大小d
      */
     private int sizeClasses() {
         int normalMaxSize = -1;

@@ -708,17 +708,15 @@ public class PooledByteBufAllocatorTest extends AbstractByteBufAllocatorTest<Poo
     @Test
     public void testPoolByteBufAllocator1() throws InterruptedException {
         PooledByteBufAllocator allocator = PooledByteBufAllocator.DEFAULT;
-        ByteBuf byteBuf = allocator.newDirectBuffer(10 * 1024, 10 * 1024);
-
-        System.gc();
-        System.gc();
-        System.gc();
-        System.gc();
-        System.gc();
-        System.out.println("====");
-        TimeUnit.SECONDS.sleep(10);
-        ByteBuf byteBuf2 = allocator.newDirectBuffer(10 * 1024, 10 * 1024);
-        TimeUnit.SECONDS.sleep(100009);
-        System.out.println("++++");
+        // 申请 32k 内存 4 页
+        allocator.newDirectBuffer(32 * 1024, 32 * 1024);
+        // 申请 32k 内存 4 页
+        allocator.newDirectBuffer(32 * 1024, 32 * 1024);
+        // 申请 5m 内存 640 页
+        allocator.newDirectBuffer(5 * 1024 * 1024, 5 * 1024 * 1024);
+        // 申请 28k 内存，和页大小 8k 的最小公倍数 56k，此次需要申请 7页内存
+        allocator.newDirectBuffer(28 * 1024, 28 * 1024);
+        // 再次申请 28k 内存，前面已经申请了 7k 内存，还有一份 28k 大小的内存没有试用
+        allocator.newDirectBuffer(28 * 1024, 28 * 1024);
     }
 }

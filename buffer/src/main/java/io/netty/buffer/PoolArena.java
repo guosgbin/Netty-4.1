@@ -163,11 +163,14 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         final int sizeIdx = size2SizeIdx(reqCapacity);
 
         // smallMaxSizeIdx默认38，38位置表示的内存大小是28k
-        if (sizeIdx <= smallMaxSizeIdx) { // 小于等于28k就是small规格的内存
+        if (sizeIdx <= smallMaxSizeIdx) {
+            // 分配 small 规格的内存
             tcacheAllocateSmall(cache, buf, reqCapacity, sizeIdx);
-        } else if (sizeIdx < nSizes) { // normal规格的内存
+        } else if (sizeIdx < nSizes) {
+            // 分配 normal规格的内存
             tcacheAllocateNormal(cache, buf, reqCapacity, sizeIdx);
-        } else { // 大于默认的16mb的内存，直接分配大内存了
+        } else {
+            // 大于默认的16mb的内存，直接分配大内存了
             int normCapacity = directMemoryCacheAlignment > 0
                     ? normalizeSize(reqCapacity) : reqCapacity;
             // Huge allocations are never served via the cache so just call allocateHuge
@@ -224,7 +227,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
     }
 
     /**
-     * 分配small规格的内存
+     * 分配 normal 规格的内存
      *
      * @param cache 线程本地缓存对象
      * @param buf 初始化的池化的内存对象 需要往里设置真正的内存位置信息

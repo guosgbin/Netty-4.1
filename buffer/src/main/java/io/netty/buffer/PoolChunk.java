@@ -565,9 +565,11 @@ final class PoolChunk<T> implements PoolChunkMetric {
      */
     void free(long handle, int normCapacity, ByteBuffer nioBuffer) {
         if (isSubpage(handle)) {
+            // small 规格内存的回收
             int sizeIdx = arena.size2SizeIdx(normCapacity);
             PoolSubpage<T> head = arena.findSubpagePoolHead(sizeIdx);
 
+            // 找到要释放内存的 页偏移量
             int sIdx = runOffset(handle);
             PoolSubpage<T> subpage = subpages[sIdx];
             assert subpage != null && subpage.doNotDestroy;
@@ -575,6 +577,9 @@ final class PoolChunk<T> implements PoolChunkMetric {
             // Obtain the head of the PoolSubPage pool that is owned by the PoolArena and synchronize on it.
             // This is need as we may add it back and so alter the linked-list structure.
             synchronized (head) {
+                // 释放 subpages 数组上的小内存
+                // 返回 true 表示 subpages 数组该位置还有子块内存在使用中
+                // 返回 false 表示 subpages 数组的该位置占用的最小公倍数页数内存可以回收了
                 if (subpage.free(head, bitmapIdx(handle))) {
                     //the subpage is still used, do not free it
                     return;
@@ -586,18 +591,23 @@ final class PoolChunk<T> implements PoolChunkMetric {
         }
 
         //start free run
+        // 找到此次回收内存的页数
         int pages = runPages(handle);
 
         synchronized (runsAvail) {
             // collapse continuous runs, successfully collapsed runs
             // will be removed from runsAvail and runsAvailMap
+            // 合并和当前 run 的 pageOffset 连续的 run
             long finalRun = collapseRuns(handle);
 
             //set run as not used
+            // 设置 run 未被使用 isUsed 位置为 0
             finalRun &= ~(1L << IS_USED_SHIFT);
             //if it is a subpage, set it to run
+            // 假如之前的 handle 表示的是 subpage，则需要清除标志位
             finalRun &= ~(1L << IS_SUBPAGE_SHIFT);
 
+            // 重新设置 runAvail 和 runAvailMap 中的值
             insertAvailRun(runOffset(finalRun), runPages(finalRun), finalRun);
             freeBytes += pages << pageShifts;
         }
@@ -612,23 +622,36 @@ final class PoolChunk<T> implements PoolChunkMetric {
         return collapseNext(collapsePast(handle));
     }
 
+    /**
+     * 向前合并连续的 run
+     */
     private long collapsePast(long handle) {
         for (;;) {
+            // 获取页偏移量
             int runOffset = runOffset(handle);
+            // 获取 run 中页的个数
             int runPages = runPages(handle);
 
+
+            // 根据 runOffset - 1，得到末尾可用的 run
             long pastRun = getAvailRunByOffset(runOffset - 1);
             if (pastRun == -1) {
+                // 没有相邻的 run，直接退出
                 return handle;
             }
 
+            // 相邻的 run 的页偏移量
             int pastOffset = runOffset(pastRun);
+            // 相邻的 run 的页的个数
             int pastPages = runPages(pastRun);
 
             //is continuous
+            // 再次判断是否连续， past 的页偏移量 + run 的页的个数 ==
             if (pastRun != handle && pastOffset + pastPages == runOffset) {
                 //remove past run
+                // 移除前面 run 的 handle 信息
                 removeAvailRun(pastRun);
+                // 计算出新的 handle
                 handle = toRunHandle(pastOffset, pastPages + runPages, 0);
             } else {
                 return handle;
@@ -636,23 +659,34 @@ final class PoolChunk<T> implements PoolChunkMetric {
         }
     }
 
+    /**
+     * 向后合并连续的 run
+     */
     private long collapseNext(long handle) {
         for (;;) {
+            // 当前 handle 的页偏移量
             int runOffset = runOffset(handle);
+            // 当前 handle 表示的中页的个数
             int runPages = runPages(handle);
 
             long nextRun = getAvailRunByOffset(runOffset + runPages);
             if (nextRun == -1) {
+                // 后面没有连续的 run
                 return handle;
             }
 
+            // 根据后面的 handle 获取页偏移量
             int nextOffset = runOffset(nextRun);
+            // 获取页的个数
             int nextPages = runPages(nextRun);
 
             //is continuous
+            // 再次判断
             if (nextRun != handle && runOffset + runPages == nextOffset) {
                 //remove next run
+                // 删除旧的 handle
                 removeAvailRun(nextRun);
+                // 计算新的 handle
                 handle = toRunHandle(runOffset, runPages + nextPages, 0);
             } else {
                 return handle;
