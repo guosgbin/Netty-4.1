@@ -45,6 +45,7 @@ import io.netty.util.internal.TypeParameterMatcher;
  */
 public abstract class MessageToByteEncoder<I> extends ChannelOutboundHandlerAdapter {
 
+    // 类型匹配器，提取实现类实现的真实泛型，创建出一个 ReflectiveMatcher 对象
     private final TypeParameterMatcher matcher;
     private final boolean preferDirect;
 
@@ -70,6 +71,7 @@ public abstract class MessageToByteEncoder<I> extends ChannelOutboundHandlerAdap
      *                              {@link ByteBuf}, which is backed by an byte array.
      */
     protected MessageToByteEncoder(boolean preferDirect) {
+        // 提起当前对象的真实泛型
         matcher = TypeParameterMatcher.find(this, MessageToByteEncoder.class, "I");
         this.preferDirect = preferDirect;
     }
@@ -99,9 +101,11 @@ public abstract class MessageToByteEncoder<I> extends ChannelOutboundHandlerAdap
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         ByteBuf buf = null;
         try {
+            // 条件成立 说明当前编码器 可以对 msg 对象编码
             if (acceptOutboundMessage(msg)) {
                 @SuppressWarnings("unchecked")
                 I cast = (I) msg;
+                // 去内存池中申请 byteBuf，一般子类会重写这个方法
                 buf = allocateBuffer(ctx, cast, preferDirect);
                 try {
                     encode(ctx, cast, buf);
@@ -110,9 +114,13 @@ public abstract class MessageToByteEncoder<I> extends ChannelOutboundHandlerAdap
                 }
 
                 if (buf.isReadable()) {
+                    // 条件成立，说明编码成功，buf 内有有效数据，需要向下一个出站处理器传递
                     ctx.write(buf, promise);
                 } else {
+                    // 执行到这里说明 encode方法未向 bytebuf 写任何数据，说明没写啥数据，
+                    // 这里将从内存池申请的 ByteBuf 释放
                     buf.release();
+                    // 传递一个空的 buuffer
                     ctx.write(Unpooled.EMPTY_BUFFER, promise);
                 }
                 buf = null;
