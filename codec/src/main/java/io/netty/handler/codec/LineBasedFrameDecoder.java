@@ -36,16 +36,22 @@ import java.util.List;
 public class LineBasedFrameDecoder extends ByteToMessageDecoder {
 
     /** Maximum length of a frame we're willing to decode.  */
+    // 最大长度，如果客户端发来的业务层的数据包的长度超过这个长度，解码器会发出异常
     private final int maxLength;
     /** Whether or not to throw an exception as soon as we exceed maxLength. */
+    // 是否快速失败
     private final boolean failFast;
+    // 是否跳过分割符字节
     private final boolean stripDelimiter;
 
     /** True if we're discarding input because we're already over maxLength.  */
+    // 是否是丢弃模式，true 表示丢弃模式，false 是正常模式
     private boolean discarding;
+    // 丢弃模式模式的时候，当前已丢弃的数据量
     private int discardedBytes;
 
     /** Last scan position. */
+    // 上一次从堆积区的扫描位点，只有堆积区是半包数据时才会使用到
     private int offset;
 
     /**
@@ -96,32 +102,45 @@ public class LineBasedFrameDecoder extends ByteToMessageDecoder {
      *                          be created.
      */
     protected Object decode(ChannelHandlerContext ctx, ByteBuf buffer) throws Exception {
+        // 从堆积区查找换行符的位置
         final int eol = findEndOfLine(buffer);
         if (!discarding) {
+            // 当前是正常模式，不是丢弃模式
             if (eol >= 0) {
+                // 堆积区中查找到换行符
+
                 final ByteBuf frame;
+                // 获取当前数据包的长度
                 final int length = eol - buffer.readerIndex();
+                // 获取换行符的长度
                 final int delimLength = buffer.getByte(eol) == '\r'? 2 : 1;
 
                 if (length > maxLength) {
+                    // 超过最大长度了，需要跳过
                     buffer.readerIndex(eol + delimLength);
                     fail(ctx, length);
                     return null;
                 }
 
                 if (stripDelimiter) {
+                    // 需要跳过换行符跳过
                     frame = buffer.readRetainedSlice(length);
                     buffer.skipBytes(delimLength);
                 } else {
                     frame = buffer.readRetainedSlice(length + delimLength);
                 }
 
+                // 返回切片出来的数据包
                 return frame;
             } else {
+                // 执行到这里说明堆积区中没有找到换行符
+                // 获取堆积区的可用数据量长度
                 final int length = buffer.readableBytes();
+                // 条件成立：说明堆积区内的数据量已经超过最大帧的长度了，需要开启丢弃模式
                 if (length > maxLength) {
                     discardedBytes = length;
                     buffer.readerIndex(buffer.writerIndex());
+                    // 开启丢弃模式
                     discarding = true;
                     offset = 0;
                     if (failFast) {
@@ -131,6 +150,9 @@ public class LineBasedFrameDecoder extends ByteToMessageDecoder {
                 return null;
             }
         } else {
+            // 执行到这里说明解码器是丢弃模式
+
+            // 条件成立 说明当前堆积区已经查找到了换行符了，需要丢弃半包数据，并且设置编码器为正常模式
             if (eol >= 0) {
                 final int length = discardedBytes + eol - buffer.readerIndex();
                 final int delimLength = buffer.getByte(eol) == '\r'? 2 : 1;
@@ -141,6 +163,8 @@ public class LineBasedFrameDecoder extends ByteToMessageDecoder {
                     fail(ctx, length);
                 }
             } else {
+                // 执行到这里，说明仍然未找到换行符，需要继续丢弃数据，并保持丢弃模式
+
                 discardedBytes += buffer.readableBytes();
                 buffer.readerIndex(buffer.writerIndex());
                 // We skip everything in the buffer, we need to set the offset to 0 again.
@@ -163,16 +187,24 @@ public class LineBasedFrameDecoder extends ByteToMessageDecoder {
     /**
      * Returns the index in the buffer of the end of line found.
      * Returns -1 if no end of line was found in the buffer.
+     *
+     * 从堆积区查找换行符的位置
      */
     private int findEndOfLine(final ByteBuf buffer) {
+        // 堆积区总长度
         int totalLength = buffer.readableBytes();
+        // 返回换行符在堆积区的位置
         int i = buffer.forEachByte(buffer.readerIndex() + offset, totalLength - offset, ByteProcessor.FIND_LF);
         if (i >= 0) {
+            // 在堆积区中找到了换行符的位置
             offset = 0;
+            // 条件成立，说明在堆积区内查找的换行符是 "\r\n"
             if (i > 0 && buffer.getByte(i - 1) == '\r') {
                 i--;
             }
         } else {
+            // 在堆积区中未找到换行符的位置，需要设置 offset 为 totalLength
+            // 因为当前堆积区是一个半包的业务数据，下次堆积区再次积累新数据之后，再调用当前 decode 需要从 offset 开始检查换行符
             offset = totalLength;
         }
         return i;

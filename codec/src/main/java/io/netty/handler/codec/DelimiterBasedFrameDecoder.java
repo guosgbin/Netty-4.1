@@ -60,13 +60,20 @@ import java.util.List;
  */
 public class DelimiterBasedFrameDecoder extends ByteToMessageDecoder {
 
+    // 指定分隔符的数组
     private final ByteBuf[] delimiters;
+    // 业务层指定的最大包长度
     private final int maxFrameLength;
+    // 是否跳过分隔符
     private final boolean stripDelimiter;
+    // 是否快速失败
     private final boolean failFast;
+    // 是否是丢弃模式
     private boolean discardingTooLongFrame;
+    // 丢弃模式下记录已丢弃的数据量
     private int tooLongFrameLength;
     /** Set only when decoding with "\n" and "\r\n" as the delimiter.  */
+    // 如果是 换行符 作为分隔符，直接委托 LineBasedFrameDecoder 去处理
     private final LineBasedFrameDecoder lineBasedDecoder;
 
     /**
@@ -170,6 +177,7 @@ public class DelimiterBasedFrameDecoder extends ByteToMessageDecoder {
         ObjectUtil.checkNonEmpty(delimiters, "delimiters");
 
         if (isLineBased(delimiters) && !isSubclass()) {
+            // 委托给 lineBasedDecoder
             lineBasedDecoder = new LineBasedFrameDecoder(maxFrameLength, stripDelimiter, failFast);
             this.delimiters = null;
         } else {
@@ -227,11 +235,14 @@ public class DelimiterBasedFrameDecoder extends ByteToMessageDecoder {
      */
     protected Object decode(ChannelHandlerContext ctx, ByteBuf buffer) throws Exception {
         if (lineBasedDecoder != null) {
+            // 委托给 lineBasedDecoder
             return lineBasedDecoder.decode(ctx, buffer);
         }
         // Try all delimiters and choose the delimiter which yields the shortest frame.
         int minFrameLength = Integer.MAX_VALUE;
         ByteBuf minDelim = null;
+        // 处理处理多个 分隔符的时候
+        // 例如 分隔符有两个 [@@，##], 读取的数据 [1234@@1231##]，此时需要分割
         for (ByteBuf delim: delimiters) {
             int frameLength = indexOf(buffer, delim);
             if (frameLength >= 0 && frameLength < minFrameLength) {
